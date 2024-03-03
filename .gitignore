@@ -6,4 +6,5 @@
 *.fatbin
 
 *.o
+test_generate_input
 test_uniform_random

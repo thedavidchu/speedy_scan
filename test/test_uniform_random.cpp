@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <iostream>
 
-#include "random/uniform_random.hpp"
+#include "uniform_random.hpp"
 
 /// @note   This is a fake test file because I used the code under test as the
 ///         oracle. I also trust it because a "professional" wrote it...
