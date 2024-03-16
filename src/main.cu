@@ -1,22 +1,18 @@
-#include <iostream>
-#include <string>
-#include <cstring>
-#include <vector>
-#include <cstdlib>
 #include <cerrno>
 #include <climits>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <string>
+#include <vector>
 
-enum class InclusiveScanType {
-    Baseline, DecoupledLookback, NvidiaScan
-};
+enum class InclusiveScanType { Baseline, DecoupledLookback, NvidiaScan };
 
 static void
 print_error(std::string msg)
 {
     std::cerr << "Error: " << msg << std::endl;
 }
-
-
 
 struct CommandLineArguments {
     std::string exe_ = "?";
@@ -86,20 +82,29 @@ CommandLineArguments::CommandLineArguments(int argc, char *argv[])
 void
 CommandLineArguments::print()
 {
-    std::cout << "CommandLineArguments(type='" <<
-            inclusive_scan_type_to_input_string(this->type_) <<
-            "', size=" << this->size_ << ", repeats=" << this->repeats_ <<
-            ")" << std::endl;
+    std::cout << "CommandLineArguments(type='"
+              << inclusive_scan_type_to_input_string(this->type_)
+              << "', size=" << this->size_ << ", repeats=" << this->repeats_
+              << ")" << std::endl;
 }
 
 void
 CommandLineArguments::print_help()
 {
-    std::cout << "Usage: " << this->exe_ << " [-t <scan-type>] [-s <input-size>] [-r <repetitions>]" << std::endl;
-    std::cout << "    -t, --type: scan type, {baseline,decoupled-lookback,nvidia}. Default: baseline" << std::endl;
-    std::cout << "    -s, --size: number of input elements, 1..= ~1_000_000_000. Default: 1000" << std::endl;
-    std::cout << "    -r, --repeats: number of times the test is repeated, 0..=MAX_UNSIGNED_INT. Default: 1" << std::endl;
-    std::cout << "    -h, --help: print this help message. Overrides all else!" << std::endl;
+    std::cout << "Usage: " << this->exe_
+              << " [-t <scan-type>] [-s <input-size>] [-r <repetitions>]"
+              << std::endl;
+    std::cout << "    -t, --type: scan type, "
+                 "{baseline,decoupled-lookback,nvidia}. Default: baseline"
+              << std::endl;
+    std::cout << "    -s, --size: number of input elements, 1..= "
+                 "~1_000_000_000. Default: 1000"
+              << std::endl;
+    std::cout << "    -r, --repeats: number of times the test is repeated, "
+                 "0..=MAX_UNSIGNED_INT. Default: 1"
+              << std::endl;
+    std::cout << "    -h, --help: print this help message. Overrides all else!"
+              << std::endl;
 }
 
 InclusiveScanType
@@ -119,7 +124,8 @@ CommandLineArguments::parse_inclusive_scan_type(char *arg)
 }
 
 std::string
-CommandLineArguments::inclusive_scan_type_to_input_string(InclusiveScanType type)
+CommandLineArguments::inclusive_scan_type_to_input_string(
+    InclusiveScanType type)
 {
     switch (type) {
     case InclusiveScanType::Baseline:
