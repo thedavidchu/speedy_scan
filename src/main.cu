@@ -1,5 +1,4 @@
 #include <cassert>
-#include <cerrno>
 #include <climits>
 #include <cstdint>
 #include <cstdlib>
@@ -7,6 +6,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include <sys/time.h>
+#include <stdio.h>
 
 #include "generate_input.hpp"
 
@@ -181,9 +183,28 @@ CommandLineArguments::inclusive_scan_type_to_input_string(
     }
 }
 
+double
+get_time_in_seconds()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (double)tv.tv_usec / 1000000 + tv.tv_sec;
+}
+
+void
+print_duration(double start_time, double end_time)
+{
+    // NOTE I'm using the C printf function so that I can specify the format of
+    //      the double's output string! We print 6 significant figures because
+    //      we only measure to microsecond accuracy, which is 6 significant
+    //      figures. Wow, I didn't realize this until now!
+    printf("@@@ Elapsed time (sec): %.6f\n", end_time - start_time);
+}
+
 int
 main(int argc, char *argv[])
 {
+    cudaDeviceReset();
     CommandLineArguments cmd_args(argc, argv);
 
     // Generate inputs
@@ -208,19 +229,28 @@ main(int argc, char *argv[])
     case InclusiveScanType::Baseline:
         cmd_args.print();
         for (int i = 0; i < cmd_args.repeats_; ++i) {
+            double start_time = get_time_in_seconds();
             // TODO Call baseline kernel
+            double end_time = get_time_in_seconds();
+            print_duration(start_time, end_time);
         }
         break;
     case InclusiveScanType::DecoupledLookback:
         cmd_args.print();
         for (int i = 0; i < cmd_args.repeats_; ++i) {
+            double start_time = get_time_in_seconds();
             // TODO Call decoupled lookback kernel
+            double end_time = get_time_in_seconds();
+            print_duration(start_time, end_time);
         }
         break;
     case InclusiveScanType::NvidiaScan:
         cmd_args.print();
         for (int i = 0; i < cmd_args.repeats_; ++i) {
+            double start_time = get_time_in_seconds();
             // TODO Call nvidia kernel
+            double end_time = get_time_in_seconds();
+            print_duration(start_time, end_time);
         }
         break;
     default:
@@ -247,5 +277,7 @@ main(int argc, char *argv[])
     cudaFree(d_input);
     cudaFree(d_input);
     cudaFreeHost(h_output);
+
+    cudaDeviceReset();
     return 0;
 }
