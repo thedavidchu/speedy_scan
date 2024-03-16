@@ -5,7 +5,11 @@
 *.cubin
 *.fatbin
 
+# Executables
 *.o
 main
 test_generate_input
 test_uniform_random
+
+# Results
+performance-timings.png
