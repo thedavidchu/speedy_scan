@@ -7,10 +7,14 @@
 #include <string>
 #include <vector>
 
-#include <sys/time.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 #include "generate_input.hpp"
+
+// defined in each of the implementations
+extern void
+impl_decoupled_lookback(const int32_t *input, int32_t *output, size_t size);
 
 enum class InclusiveScanType { Baseline, DecoupledLookback, NvidiaScan };
 
@@ -225,37 +229,28 @@ main(int argc, char *argv[])
     // Copy input from host to device
     cudaMemcpy(d_input, h_input.data(), size, cudaMemcpyHostToDevice);
 
-    switch (cmd_args.type_) {
-    case InclusiveScanType::Baseline:
-        cmd_args.print();
-        for (int i = 0; i < cmd_args.repeats_; ++i) {
-            double start_time = get_time_in_seconds();
-            // TODO Call baseline kernel
-            double end_time = get_time_in_seconds();
-            print_duration(start_time, end_time);
+    cmd_args.print();
+    for (int i = 0; i < cmd_args.repeats_; ++i) {
+        const double start_time = get_time_in_seconds();
+        switch (cmd_args.type_) {
+        case InclusiveScanType::Baseline:
+            break;
+
+        case InclusiveScanType::DecoupledLookback:
+            impl_decoupled_lookback(d_input, d_output, cmd_args.size_);
+            break;
+
+        case InclusiveScanType::NvidiaScan:
+            // TODO
+            break;
+
+        default:
+            print_error("unrecognized scan type!");
+            exit(-1);
         }
-        break;
-    case InclusiveScanType::DecoupledLookback:
-        cmd_args.print();
-        for (int i = 0; i < cmd_args.repeats_; ++i) {
-            double start_time = get_time_in_seconds();
-            // TODO Call decoupled lookback kernel
-            double end_time = get_time_in_seconds();
-            print_duration(start_time, end_time);
-        }
-        break;
-    case InclusiveScanType::NvidiaScan:
-        cmd_args.print();
-        for (int i = 0; i < cmd_args.repeats_; ++i) {
-            double start_time = get_time_in_seconds();
-            // TODO Call nvidia kernel
-            double end_time = get_time_in_seconds();
-            print_duration(start_time, end_time);
-        }
-        break;
-    default:
-        print_error("unrecognized scan type!");
-        exit(-1);
+
+        const double end_time = get_time_in_seconds();
+        print_duration(start_time, end_time);
     }
 
     // Copy output from device to host

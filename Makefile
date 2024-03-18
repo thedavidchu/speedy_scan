@@ -1,16 +1,22 @@
 CXX=g++
 NVCC=nvcc
-CXXFLAGS=-Wall -Wextra -Werror -g
+
+CUDA_SM := sm_86
+
+CXXSTD := -std=c++17
+CXXFLAGS=-Wall -Wextra -Werror -g $(CXXSTD)
+
+CUDA_SRCS = $(shell find src -name "*.cu")
 
 .PHONY: all clean
 
-all: clean main
+all: main
 
 test: test_generate_input test_uniform_random
 
 # Main source files
-main: src/main.cu
-	$(NVCC) -Xcompiler "$(CXXFLAGS)" src/main.cu -I src -o main
+main: $(CUDA_SRCS)
+	$(NVCC) $(CXXSTD) -arch $(CUDA_SM) -Xcompiler "$(CXXFLAGS)" $^ -I src -o $@
 
 # Testing files
 test_generate_input: test/test_generate_input.cpp
