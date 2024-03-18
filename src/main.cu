@@ -16,6 +16,9 @@
 extern void
 impl_decoupled_lookback(const int32_t *input, int32_t *output, size_t size);
 
+extern void
+impl_nvidia(const int32_t *input, int32_t *output, size_t size);
+
 enum class InclusiveScanType { Baseline, DecoupledLookback, NvidiaScan };
 
 static void
@@ -234,6 +237,7 @@ main(int argc, char *argv[])
         const double start_time = get_time_in_seconds();
         switch (cmd_args.type_) {
         case InclusiveScanType::Baseline:
+            // TODO
             break;
 
         case InclusiveScanType::DecoupledLookback:
@@ -241,7 +245,7 @@ main(int argc, char *argv[])
             break;
 
         case InclusiveScanType::NvidiaScan:
-            // TODO
+            impl_nvidia(d_input, d_output, cmd_args.size_);
             break;
 
         default:

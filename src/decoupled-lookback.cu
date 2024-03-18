@@ -248,11 +248,12 @@ __launch_bounds__(CHUNK_SIZE) void kernel(const int32_t *restrict in,
         store_status(&statuses[block_idx], {final_sum, ChunkState::Finished});
 
     // now every thread just writes its value to global memory.
-    if (chunk_size == CHUNK_SIZE)
+    if (chunk_size == CHUNK_SIZE) {
         __stcg(&out[input_idx], final_sum);
-    else if (const auto thread_ofs = chunk_ofs + thread_idx;
-             thread_ofs < num_elems)
+    } else if (const auto thread_ofs = chunk_ofs + thread_idx;
+               thread_ofs < num_elems) {
         __stcg(&out[thread_ofs], final_sum);
+    }
 }
 
 void
