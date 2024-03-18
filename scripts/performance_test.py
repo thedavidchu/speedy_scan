@@ -50,7 +50,8 @@ def run_and_time_main(scan_type: str, size: int) -> List[float]:
         text=True,
     )
     lines = [re.match(pattern, s) for s in out.stdout.split("\n")]
-    print(f"Original: {lines}")
+    # print(f"Original: {lines}")
+    print(f"{out.stdout.splitlines()}")
     times = [float(m.group(1)) for m in lines if m is not None]
     return times
 

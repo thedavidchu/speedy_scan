@@ -7,6 +7,7 @@ CXXSTD := -std=c++17
 CXXFLAGS=-Wall -Wextra -Werror -g $(CXXSTD)
 
 CUDA_SRCS = $(shell find src -name "*.cu")
+CUDA_HDRS = $(shell find src -name "*.h" -or -iname "*.hpp")
 
 .PHONY: all clean
 
@@ -15,8 +16,8 @@ all: main
 test: test_generate_input test_uniform_random
 
 # Main source files
-main: $(CUDA_SRCS)
-	$(NVCC) $(CXXSTD) -arch $(CUDA_SM) -Xcompiler "$(CXXFLAGS)" $^ -I src -o $@
+main: $(CUDA_SRCS) $(CUDA_HDRS)
+	$(NVCC) $(CXXSTD) -arch $(CUDA_SM) -Xcompiler "$(CXXFLAGS)" $(filter-out %.hpp,$^) -I src -o $@
 
 # Testing files
 test_generate_input: test/test_generate_input.cpp

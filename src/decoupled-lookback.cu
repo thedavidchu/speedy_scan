@@ -3,23 +3,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <limits>
 
-#include "stdio.h"
+#include "common.hpp"
 
 #ifndef restrict
 #define restrict __restrict__
 #endif
-
-static inline void
-cuda_check(cudaError_t err)
-{
-    if (err == cudaSuccess)
-        return;
-
-    fprintf(stderr, "cuda error: %s\n", cudaGetErrorString(err));
-    exit(1);
-}
 
 constexpr unsigned MASK_ALL = 0xffff'ffffu;
 

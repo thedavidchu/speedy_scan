@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 
+#include "common.hpp"
 #include "generate_input.hpp"
 
 // defined in each of the implementations
@@ -214,23 +215,31 @@ main(int argc, char *argv[])
     cudaDeviceReset();
     CommandLineArguments cmd_args(argc, argv);
 
+    const size_t num_elems = cmd_args.size_;
+    const size_t array_size_in_bytes = sizeof(int32_t) * num_elems;
+
     // Generate inputs
-    int32_t *d_input = NULL;
-    int32_t *d_output = NULL;
     std::vector<int32_t> h_input;
     if (cmd_args.debug_) {
         h_input = std::vector<int32_t>(cmd_args.size_, 1);
     } else {
         h_input = generate_input(cmd_args.size_, 0);
     }
-    const size_t size = sizeof(*d_input) * cmd_args.size_;
 
     // Allocate memory
-    cudaMalloc((void **)d_input, size);
-    cudaMalloc((void **)d_output, size);
+    int32_t *d_input = nullptr;
+    int32_t *d_output = nullptr;
+    cuda_check(cudaMalloc((void **)&d_input, array_size_in_bytes),
+               "cudaMalloc(d_input)");
+    cuda_check(cudaMalloc((void **)&d_output, array_size_in_bytes),
+               "cudaMalloc(d_output)");
 
     // Copy input from host to device
-    cudaMemcpy(d_input, h_input.data(), size, cudaMemcpyHostToDevice);
+    cuda_check(cudaMemcpy(d_input,
+                          h_input.data(),
+                          array_size_in_bytes,
+                          cudaMemcpyHostToDevice),
+               "cudaMemcpy(H2D)");
 
     cmd_args.print();
     for (int i = 0; i < cmd_args.repeats_; ++i) {
@@ -241,11 +250,11 @@ main(int argc, char *argv[])
             break;
 
         case InclusiveScanType::DecoupledLookback:
-            impl_decoupled_lookback(d_input, d_output, cmd_args.size_);
+            impl_decoupled_lookback(d_input, d_output, num_elems);
             break;
 
         case InclusiveScanType::NvidiaScan:
-            impl_nvidia(d_input, d_output, cmd_args.size_);
+            impl_nvidia(d_input, d_output, num_elems);
             break;
 
         default:
@@ -258,15 +267,22 @@ main(int argc, char *argv[])
     }
 
     // Copy output from device to host
-    int32_t *h_output = NULL;
-    cudaHostAlloc(&h_output, size, cudaHostAllocDefault);
-    assert(h_output != NULL);
-    cudaMemcpy(h_output, d_output, size, cudaMemcpyHostToDevice);
+    int32_t *h_output = nullptr;
+    cuda_check(
+        cudaHostAlloc(&h_output, array_size_in_bytes, cudaHostAllocDefault),
+        "cudaHostAlloc(h_output)");
+    assert(h_output != nullptr);
+
+    cuda_check(cudaMemcpy(h_output,
+                          d_output,
+                          array_size_in_bytes,
+                          cudaMemcpyHostToDevice),
+               "cudaMemcpy(D2H)");
 
     // Optionally check answer!
     if (cmd_args.check_) {
         int32_t ans = 0;
-        for (int i = 0; i < cmd_args.size_; ++i) {
+        for (size_t i = 0; i < num_elems; ++i) {
             ans += h_input[i];
             assert(ans == h_output[i]);
         }
