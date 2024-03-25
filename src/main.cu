@@ -214,6 +214,7 @@ main(int argc, char *argv[])
 {
     cudaDeviceReset();
     CommandLineArguments cmd_args(argc, argv);
+    cmd_args.print();
 
     const size_t num_elems = cmd_args.size_;
     const size_t array_size_in_bytes = sizeof(int32_t) * num_elems;
@@ -241,7 +242,6 @@ main(int argc, char *argv[])
                           cudaMemcpyHostToDevice),
                "cudaMemcpy(H2D)");
 
-    cmd_args.print();
     for (int i = 0; i < cmd_args.repeats_; ++i) {
         const double start_time = get_time_in_seconds();
         switch (cmd_args.type_) {
@@ -284,7 +284,11 @@ main(int argc, char *argv[])
         int32_t ans = 0;
         for (size_t i = 0; i < num_elems; ++i) {
             ans += h_input[i];
-            assert(ans == h_output[i]);
+            if (ans != h_output[i]) {
+                std::cerr << "Error: output mismatch at " << i << ". Expected "
+                          << ans << ", but got " << h_output[i] << std::endl;
+                exit(-1);
+            }
         }
     }
 
