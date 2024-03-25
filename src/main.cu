@@ -15,6 +15,9 @@
 
 // defined in each of the implementations
 extern void
+impl_baseline(const int32_t *input, int32_t *output, size_t size);
+
+extern void
 impl_decoupled_lookback(const int32_t *input, int32_t *output, size_t size);
 
 extern void
@@ -246,7 +249,7 @@ main(int argc, char *argv[])
         const double start_time = get_time_in_seconds();
         switch (cmd_args.type_) {
         case InclusiveScanType::Baseline:
-            // TODO
+            impl_baseline(d_input, d_output, num_elems);
             break;
 
         case InclusiveScanType::DecoupledLookback:
