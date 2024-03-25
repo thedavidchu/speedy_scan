@@ -95,7 +95,8 @@ def main():
 
     # Optionally recompile the executable
     if args.recompile:
-        run(["make"])
+        run("make clean".split())
+        run("make")
 
     table = {
         key: {size: [] for size in COMMAND_LINE_INPUT_SIZES}
