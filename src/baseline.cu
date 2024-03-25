@@ -6,16 +6,18 @@
 ///
 /// @detailed   For every valid N (i.e. greater than or equal to 1), insert
 ///             padding between every N elements to prevent bank conflicts. Note
-///             that the performance drops a bit for adding padding of {16, 32, 64}
-///             and drops a lot for non-power-of-2 padding (e.g. 15).
-#define PADDED_EVERY_N(x, n)            ((n) <= 0) ? (x) : (((n) + 1) * ((x) / (n)) + (x) % (n))
-#define PADDED(x)                       PADDED_EVERY_N((x), 16)
+///             that the performance drops a bit for adding padding of {16, 32,
+///             64} and drops a lot for non-power-of-2 padding (e.g. 15).
+#define PADDED_EVERY_N(x, n)                                                   \
+    ((n) <= 0) ? (x) : (((n) + 1) * ((x) / (n)) + (x) % (n))
+#define PADDED(x) PADDED_EVERY_N((x), 16)
 
 /// @brief  Ceiling divide size_t.
 ///
 /// Assuming numerator + denominator does not overflow.
-/// Source: https://stackoverflow.com/questions/2745074/fast-ceiling-of-an-integer-division-in-c-c
-#define CEIL_DIV(n, d)                  (((n) + (d) - 1) / (d))
+/// Source:
+/// https://stackoverflow.com/questions/2745074/fast-ceiling-of-an-integer-division-in-c-c
+#define CEIL_DIV(n, d) (((n) + (d)-1) / (d))
 
 __device__ __forceinline__ int32_t
 warp_scan(int32_t my_val)
@@ -36,25 +38,29 @@ warp_scan(int32_t my_val)
 /// @detailed   See Figure 2(a) in the Decoupled Look-back paper
 ///
 /// @param  d_output: int32_t*
-///             array of outputs. Potentially, we could allow this to be nullable
-///             to prevent copying d_input to d_output if the latter already has
-///             the data (e.g. if we are using reduction_array)
+///             array of outputs. Potentially, we could allow this to be
+///             nullable to prevent copying d_input to d_output if the latter
+///             already has the data (e.g. if we are using reduction_array)
 /// @param  reduction_array: int32_t*
 ///             array of the maximum of each thread block. NULL if we do not
 ///             want to collect this information.
 ///
 /// @note   We could improve the efficiency of this because this is really four
 ///         functions smooshed together.
-/// 
-///         1. Scan 1024 elements from d_input into d_output, record max in reduction_array
+///
+///         1. Scan 1024 elements from d_input into d_output, record max in
+///         reduction_array
 ///         2. Scan up-to 1024 elements from d_input into d_output
-///         3. Scan up-to 1024 elements from reduction_array into reduction_array
+///         3. Scan up-to 1024 elements from reduction_array into
+///         reduction_array
 ///         4. (optional) the above but with 1024 fixed elements. Only if we had
 ///            more than 1024x1024 elements.
-template<size_t max_num_threads>
+template <size_t max_num_threads>
 __global__ void
-block_scan(int32_t const *d_input, int32_t *d_output,
-                    size_t const size, int32_t *const reduction_array)
+block_scan(int32_t const *d_input,
+           int32_t *d_output,
+           size_t const size,
+           int32_t *const reduction_array)
 {
     // Shared memory is supposed to be 100x faster than global memory
     constexpr const int num_warps = CEIL_DIV(max_num_threads, 32);
@@ -71,22 +77,22 @@ block_scan(int32_t const *d_input, int32_t *d_output,
     int32_t r3 = 0;
     if (global_idx + 3 < size) {
         // Copy to warp and reduce warp
-        r0 =      d_input[global_idx + 0];
+        r0 = d_input[global_idx + 0];
         r1 = r0 + d_input[global_idx + 1];
         r2 = r1 + d_input[global_idx + 2];
         r3 = r2 + d_input[global_idx + 3];
     } else if (global_idx + 2 < size) {
-        r0 =      d_input[global_idx + 0];
+        r0 = d_input[global_idx + 0];
         r1 = r0 + d_input[global_idx + 1];
         r2 = r1 + d_input[global_idx + 2];
         r3 = r2;
     } else if (global_idx + 1 < size) {
-        r0 =      d_input[global_idx + 0];
+        r0 = d_input[global_idx + 0];
         r1 = r0 + d_input[global_idx + 1];
         r2 = r1;
         r3 = r1;
     } else if (global_idx + 0 < size) {
-        r0 =      d_input[global_idx + 0];
+        r0 = d_input[global_idx + 0];
         r1 = r0;
         r2 = r0;
         r3 = r0;
@@ -109,11 +115,13 @@ block_scan(int32_t const *d_input, int32_t *d_output,
     // Strided Propagations
     if (warp_id == 0) {
         // 1. Read from max of each warp
-        int32_t my_val = t_id < num_warps ? buffer_max_of_warps[PADDED(t_id)] : 0;
+        int32_t my_val =
+            t_id < num_warps ? buffer_max_of_warps[PADDED(t_id)] : 0;
         __syncwarp();
         // 2. Reduce max of each warp
         for (size_t offset = 1; offset < num_warps; offset *= 2) {
-            const int32_t other_val = __shfl_up_sync(0xFFFFFFFF, my_val, offset);
+            const int32_t other_val =
+                __shfl_up_sync(0xFFFFFFFF, my_val, offset);
             if (t_lane >= offset) {
                 my_val += other_val;
             }
@@ -134,14 +142,15 @@ block_scan(int32_t const *d_input, int32_t *d_output,
         r2 += max_of_prev_warp;
         r3 += max_of_prev_warp;
     }
-    // If not the first thread, 
+    // If not the first thread,
     __syncthreads();
 
-    // Last thread writes its last element to the global array (i.e. total reduction)
+    // Last thread writes its last element to the global array (i.e. total
+    // reduction)
     if (t_id == max_num_threads - 1 && reduction_array != NULL) {
         reduction_array[blockIdx.x] = r3;
     }
-    d_output[global_idx    ] = r0;
+    d_output[global_idx] = r0;
     d_output[global_idx + 1] = r1;
     d_output[global_idx + 2] = r2;
     d_output[global_idx + 3] = r3;
@@ -149,7 +158,9 @@ block_scan(int32_t const *d_input, int32_t *d_output,
 
 /// @brief  Add the last element of the previous block to the current block.
 __global__ void
-add_to_all_upto1024(int32_t *const d_output, size_t const size, int32_t const *const reduction_array)
+add_to_all_upto1024(int32_t *const d_output,
+                    size_t const size,
+                    int32_t const *const reduction_array)
 {
     const int dst_idx = 4 * ((blockIdx.x + 1) * blockDim.x + threadIdx.x);
     const int src_idx = blockIdx.x;
@@ -181,15 +192,19 @@ hierarchical_scan(const int32_t *d_input, int32_t *d_output, size_t size)
     size_t num_blocks = CEIL_DIV(size, 4 * MAX_THREADS);
     if (size > 4 * MAX_THREADS) {
         int32_t *reductions = NULL;
-        /*assert no error*/cudaMalloc((void **)&reductions, num_blocks * sizeof(int32_t));
-        block_scan<MAX_THREADS><<<num_blocks, MAX_THREADS>>>(d_input, d_output, size, reductions);
+        /*assert no error*/ cudaMalloc((void **)&reductions,
+                                       num_blocks * sizeof(int32_t));
+        block_scan<MAX_THREADS>
+            <<<num_blocks, MAX_THREADS>>>(d_input, d_output, size, reductions);
         cudaDeviceSynchronize();
         // Perform scan on reductions
         hierarchical_scan(reductions, reductions, num_blocks);
         // Add scan to blocks
-        add_to_all_upto1024<<<num_blocks - 1, MAX_THREADS>>>(d_output, size, reductions);
+        add_to_all_upto1024<<<num_blocks - 1, MAX_THREADS>>>(d_output,
+                                                             size,
+                                                             reductions);
         cudaDeviceSynchronize();
-        /*assert no error*/cudaFree(reductions);
+        /*assert no error*/ cudaFree(reductions);
     } else {
         block_scan<MAX_THREADS><<<1, size>>>(d_input, d_output, size, NULL);
         cudaDeviceSynchronize();
