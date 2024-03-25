@@ -84,12 +84,18 @@ def plot_timings(table: Dict[str, Dict[int, List[int]]]):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--recompile", action="store_true", help="Recompile the executable")
     parser.add_argument("--debug", "-d", action="store_true", help="Debug mode")
     parser.add_argument("--check", "-c", action="store_true", help="Check output")
     args = parser.parse_args()
+
     debug_mode, check_output = args.debug, args.check
 
     chdir_to_top_level()
+
+    # Optionally recompile the executable
+    if args.recompile:
+        run(["make"])
 
     table = {
         key: {size: [] for size in COMMAND_LINE_INPUT_SIZES}
