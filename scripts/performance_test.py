@@ -1,8 +1,10 @@
+import argparse
 import os
 import re
 from subprocess import run
 from typing import Dict, List
 from statistics import mean
+from warnings import warn
 
 import matplotlib.pyplot as plt
 
@@ -30,7 +32,7 @@ def chdir_to_top_level():
     os.chdir(path)
 
 
-def run_and_time_main(scan_type: str, size: int) -> List[float]:
+def run_and_time_main(scan_type: str, size: int, debug_mode: bool, check_output: bool) -> List[float]:
     """Time the implementation"""
     assert scan_type in {"baseline", "decoupled-lookback", "nvidia"}
     assert size in range(1, 1_000_000_000 + 1)
@@ -44,14 +46,18 @@ def run_and_time_main(scan_type: str, size: int) -> List[float]:
             f"{size}",
             "--repeats",
             "10",
+            # Add optional arguments
+            *(["--debug"] if debug_mode else []),
+            *(["--check"] if check_output else []),
         ],
         capture_output=True,
         timeout=60,
         text=True,
     )
-    lines = [re.match(pattern, s) for s in out.stdout.split("\n")]
-    # print(f"Original: {lines}")
     print(f"{out.stdout.splitlines()}")
+    if out.returncode:
+        warn(f"{out.stderr.strip()}")
+    lines = [re.match(pattern, s) for s in out.stdout.split("\n")]
     times = [float(m.group(1)) for m in lines if m is not None]
     return times
 
@@ -77,6 +83,12 @@ def plot_timings(table: Dict[str, Dict[int, List[int]]]):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", "-d", action="store_true", help="Debug mode")
+    parser.add_argument("--check", "-c", action="store_true", help="Check output")
+    args = parser.parse_args()
+    debug_mode, check_output = args.debug, args.check
+
     chdir_to_top_level()
 
     table = {
@@ -86,7 +98,7 @@ def main():
 
     for key in table:
         for size in table[key]:
-            table[key][size] = run_and_time_main(key, size)
+            table[key][size] = run_and_time_main(key, size, debug_mode, check_output)
 
     plot_timings(table)
 
