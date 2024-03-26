@@ -9,7 +9,13 @@ from warnings import warn
 import matplotlib.pyplot as plt
 
 
-COMMAND_LINE_SCAN_TYPES = ["baseline", "decoupled-lookback", "nvidia"]
+COMMAND_LINE_SCAN_TYPES = [
+    "SerialCPUBaseline",
+    # "ParallelCPUBaseline",
+    "Baseline",
+    "DecoupledLookback",
+    "NvidiaScan",
+]
 COMMAND_LINE_INPUT_SIZES = [
     1_000,
     10_000,
@@ -32,9 +38,11 @@ def chdir_to_top_level():
     os.chdir(path)
 
 
-def run_and_time_main(scan_type: str, size: int, debug_mode: bool, check_output: bool) -> List[float]:
+def run_and_time_main(
+    scan_type: str, size: int, debug_mode: bool, check_output: bool
+) -> List[float]:
     """Time the implementation"""
-    assert scan_type in {"baseline", "decoupled-lookback", "nvidia"}
+    assert scan_type in COMMAND_LINE_SCAN_TYPES
     assert size in range(1, 1_000_000_000 + 1)
     pattern = re.compile(r"@@@ Elapsed time [(]sec[)]: (\d+[.]\d+)")
     out = run(
@@ -71,6 +79,7 @@ def plot_timings(table: Dict[str, Dict[int, List[int]]]):
         scan_type: {size: mean(data) for size, data in data_by_size.items()}
         for scan_type, data_by_size in table.items()
     }
+    print(f"Plotted data: {avg_table}")
 
     for key, data_by_size in avg_table.items():
         plt.plot(data_by_size.keys(), data_by_size.values(), label=key)
@@ -84,7 +93,9 @@ def plot_timings(table: Dict[str, Dict[int, List[int]]]):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--recompile", action="store_true", help="Recompile the executable")
+    parser.add_argument(
+        "--recompile", action="store_true", help="Recompile the executable"
+    )
     parser.add_argument("--debug", "-d", action="store_true", help="Debug mode")
     parser.add_argument("--check", "-c", action="store_true", help="Check output")
     args = parser.parse_args()

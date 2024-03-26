@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -15,6 +16,9 @@
 
 // defined in each of the implementations
 extern void
+impl_serial_cpu_baseline(const int32_t *input, int32_t *output, size_t size);
+
+extern void
 impl_baseline(const int32_t *input, int32_t *output, size_t size);
 
 extern void
@@ -23,7 +27,22 @@ impl_decoupled_lookback(const int32_t *input, int32_t *output, size_t size);
 extern void
 impl_nvidia(const int32_t *input, int32_t *output, size_t size);
 
-enum class InclusiveScanType { Baseline, DecoupledLookback, NvidiaScan };
+enum class InclusiveScanType {
+    SerialCPUBaseline,
+    ParallelCPUBaseline,
+    Baseline,
+    DecoupledLookback,
+    NvidiaScan
+};
+
+// I just use this as an associative array
+std::map<std::string, InclusiveScanType> scan_types = {
+    {"Baseline", InclusiveScanType::Baseline},
+    {"SerialCPUBaseline", InclusiveScanType::SerialCPUBaseline},
+    {"ParallelCPUBaseline", InclusiveScanType::ParallelCPUBaseline},
+    {"DecoupledLookback", InclusiveScanType::DecoupledLookback},
+    {"NvidiaScan", InclusiveScanType::NvidiaScan},
+};
 
 static void
 print_error(std::string msg)
@@ -126,8 +145,12 @@ CommandLineArguments::print_help()
         << " [-t <scan-type>] [-s <input-size>] [-r <repetitions>] [-c] [-d]"
         << std::endl;
     std::cout << "    -t, --type <scan-type>: scan type, "
-                 "{baseline,decoupled-lookback,nvidia}. Default: baseline"
-              << std::endl;
+                 "{";
+    for (auto [str, type] : scan_types) {
+        std::cout << str << ",";
+    }
+    // Delete the trailing comma from the previous print-statement
+    std::cout << "\b}. Default: Baseline" << std::endl;
     std::cout << "    -s, --size <input-size>: number of input elements, 1..= "
                  "~1_000_000_000. Default: 1000"
               << std::endl;
@@ -147,17 +170,16 @@ CommandLineArguments::print_help()
 InclusiveScanType
 CommandLineArguments::parse_inclusive_scan_type(char *arg)
 {
-    if (matches_str(arg, {"baseline"})) {
-        return InclusiveScanType::Baseline;
-    } else if (matches_str(arg, {"decoupled-lookback"})) {
-        return InclusiveScanType::DecoupledLookback;
-    } else if (matches_str(arg, {"nvidia"})) {
-        return InclusiveScanType::NvidiaScan;
-    } else {
-        print_error("unrecognized type");
-        print_help();
-        exit(-1);
+    // Yes, I know that I could just do the lookup, but this was simpler
+    // than dealing with exceptions.
+    for (auto [str, type] : scan_types) {
+        if (matches_str(arg, {str})) {
+            return type;
+        }
     }
+    print_error("unrecognized type");
+    print_help();
+    exit(-1);
 }
 
 int
@@ -181,17 +203,15 @@ std::string
 CommandLineArguments::inclusive_scan_type_to_input_string(
     InclusiveScanType type)
 {
-    switch (type) {
-    case InclusiveScanType::Baseline:
-        return "baseline";
-    case InclusiveScanType::DecoupledLookback:
-        return "decoupled-lookback";
-    case InclusiveScanType::NvidiaScan:
-        return "nvidia";
-    default:
-        print_error("unrecognized scan type!");
-        exit(-1);
+    // Yes, I know that I could just do the lookup, but this was simpler
+    // than dealing with exceptions.
+    for (auto [str, the_type] : scan_types) {
+        if (the_type == type) {
+            return str;
+        }
     }
+    print_error("unrecognized scan type!");
+    exit(-1);
 }
 
 double
@@ -230,6 +250,11 @@ main(int argc, char *argv[])
         h_input = generate_input(cmd_args.size_, 0);
     }
 
+    // Malloc CPU outputs
+    int32_t *h_output = nullptr;
+    h_output = (int32_t *)malloc(array_size_in_bytes);
+    assert(h_output && "oom");
+
     // Allocate memory
     int32_t *d_input = nullptr;
     int32_t *d_output = nullptr;
@@ -248,6 +273,12 @@ main(int argc, char *argv[])
     for (int i = 0; i < cmd_args.repeats_; ++i) {
         const double start_time = get_time_in_seconds();
         switch (cmd_args.type_) {
+        case InclusiveScanType::SerialCPUBaseline:
+            impl_serial_cpu_baseline(h_input.data(), h_output, num_elems);
+            break;
+        case InclusiveScanType::ParallelCPUBaseline:
+            assert(0 && "not implemented");
+            break;
         case InclusiveScanType::Baseline:
             impl_baseline(d_input, d_output, num_elems);
             break;
@@ -270,17 +301,20 @@ main(int argc, char *argv[])
     }
 
     // Copy output from device to host
-    int32_t *h_output = nullptr;
-    cuda_check(
-        cudaHostAlloc(&h_output, array_size_in_bytes, cudaHostAllocDefault),
-        "cudaHostAlloc(h_output)");
-    assert(h_output != nullptr);
+    if (cmd_args.type_ == InclusiveScanType::Baseline ||
+        cmd_args.type_ == InclusiveScanType::DecoupledLookback ||
+        cmd_args.type_ == InclusiveScanType::NvidiaScan) {
+        cuda_check(
+            cudaHostAlloc(&h_output, array_size_in_bytes, cudaHostAllocDefault),
+            "cudaHostAlloc(h_output)");
+        assert(h_output != nullptr);
 
-    cuda_check(cudaMemcpy(h_output,
-                          d_output,
-                          array_size_in_bytes,
-                          cudaMemcpyHostToDevice),
-               "cudaMemcpy(D2H)");
+        cuda_check(cudaMemcpy(h_output,
+                              d_output,
+                              array_size_in_bytes,
+                              cudaMemcpyHostToDevice),
+                   "cudaMemcpy(D2H)");
+    }
 
     // Optionally check answer!
     if (cmd_args.check_) {
