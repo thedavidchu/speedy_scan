@@ -9,6 +9,8 @@ from warnings import warn
 import matplotlib.pyplot as plt
 
 
+# NOTE  I rely on these names being prefixed with either "CPU_" or
+#       "GPU_" to filter based on the hardware type.
 COMMAND_LINE_SCAN_TYPES = [
     "CPU_SerialBaseline",
     "CPU_ParallelBaseline",
@@ -16,6 +18,7 @@ COMMAND_LINE_SCAN_TYPES = [
     "GPU_OptimizedBaseline",
     "GPU_OurDecoupledLookback",
     "GPU_NvidiaDecoupledLookback",
+    "GPU_SimulateOptimalButIncorrect",
 ]
 COMMAND_LINE_INPUT_SIZES = [
     1_000,
@@ -104,11 +107,10 @@ def main():
     args = parser.parse_args()
 
     global COMMAND_LINE_SCAN_TYPES
+    assert not (args.gpu_only and args.cpu_only), "choose GPU-only, CPU-only, or neither; but not both!"
     if args.cpu_only:
-        assert not args.gpu_only
         COMMAND_LINE_SCAN_TYPES = [x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("CPU_")]
     if args.gpu_only:
-        assert not args.cpu_only
         COMMAND_LINE_SCAN_TYPES = [x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("GPU_")]
 
     debug_mode, check_output = args.debug, args.check

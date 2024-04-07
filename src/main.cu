@@ -39,6 +39,9 @@ impl_decoupled_lookback(const int32_t *input, int32_t *output, size_t size);
 extern void
 impl_nvidia(const int32_t *input, int32_t *output, size_t size);
 
+extern void
+impl_optimal_but_incorrect_gpu(const int32_t *d_input, int32_t *d_output, size_t size);
+
 enum class InclusiveScanType {
     CPU_SerialBaseline,
     CPU_ParallelBaseline,
@@ -46,6 +49,7 @@ enum class InclusiveScanType {
     GPU_OptimizedBaseline,
     GPU_OurDecoupledLookback,
     GPU_NvidiaDecoupledLookback,
+    GPU_SimulateOptimalButIncorrect,
 };
 
 // I just use this as an associative array
@@ -59,6 +63,8 @@ std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
     {"GPU_OptimizedBaseline", InclusiveScanType::GPU_OptimizedBaseline},
     {"GPU_OurDecoupledLookback", InclusiveScanType::GPU_OurDecoupledLookback},
     {"GPU_NvidiaDecoupledLookback", InclusiveScanType::GPU_NvidiaDecoupledLookback},
+    {"GPU_SimulateOptimalButIncorrect",
+     InclusiveScanType::GPU_SimulateOptimalButIncorrect},
 };
 
 static void
@@ -229,7 +235,7 @@ CommandLineArguments::parse_positive_int(char *arg)
     //      such as '1e12' being interpreted as '1'.
     x = strtol(arg, NULL, 10);
     if (x > INT_MAX) {
-        print_error("'" + std::string(arg) + "' is out of range!");
+        print_error("'" + std::string(arg) + "' is out of range (max int is " + std::to_string(INT_MAX) + ")!");
         print_help();
         exit(-1);
     } else if (x <= 0) {    // Unparseable non-integers will trigger this
@@ -343,6 +349,16 @@ main(int argc, char *argv[])
             impl_nvidia(d_input, d_output, num_elems);
             break;
 
+        case InclusiveScanType::GPU_SimulateOptimalButIncorrect:
+            if (cmd_args.check_) {
+                print_warning("GPU_SimulateOptimalButIncorrect does not return "
+                              "the correct answer; it merely simulates the "
+                              "optimal timing with a memcpy!");
+            }
+            impl_optimal_but_incorrect_gpu(d_input,
+                                                    d_output,
+                                                    num_elems);
+            break;
         default:
             print_error("unrecognized scan type!");
             exit(-1);
@@ -355,7 +371,8 @@ main(int argc, char *argv[])
     // Copy output from device to host
     if (cmd_args.type_ == InclusiveScanType::GPU_OptimizedBaseline ||
         cmd_args.type_ == InclusiveScanType::GPU_OurDecoupledLookback ||
-        cmd_args.type_ == InclusiveScanType::GPU_NvidiaDecoupledLookback) {
+        cmd_args.type_ == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
+        cmd_args.type_ == InclusiveScanType::GPU_SimulateOptimalButIncorrect) {
         cuda_check(
             cudaHostAlloc(&h_output, array_size_in_bytes, cudaHostAllocDefault),
             "cudaHostAlloc(h_output)");

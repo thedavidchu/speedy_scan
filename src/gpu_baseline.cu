@@ -1,6 +1,10 @@
-#include <cinttypes>
+#include <cstdint>
 
 #include "common.hpp"
+
+////////////////////////////////////////////////////////////////////////////////
+/// OPTIMIZED GPU BASELINE
+////////////////////////////////////////////////////////////////////////////////
 
 /// @brief  Every N elements should be padded by 1.
 ///
@@ -218,6 +222,26 @@ impl_baseline(const int32_t *d_input, int32_t *d_output, size_t size)
         printf("oh no, too many elements ):\n");
 
     hierarchical_scan(d_input, d_output, size);
+
+    cuda_check(cudaDeviceSynchronize());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// OPTIMAL BUT INCORRECT GPU
+////////////////////////////////////////////////////////////////////////////////
+
+void
+impl_optimal_but_incorrect_gpu(const int32_t *d_input,
+                               int32_t *d_output,
+                               size_t size)
+{
+    if (size > std::numeric_limits<uint32_t>::max())
+        printf("oh no, too many elements ):\n");
+
+    cuda_check(cudaMemcpy(d_output,
+                          d_input,
+                          size * sizeof(int32_t),
+                          cudaMemcpyDeviceToDevice));
 
     cuda_check(cudaDeviceSynchronize());
 }
