@@ -1,3 +1,4 @@
+import ast
 import argparse
 import os
 import re
@@ -44,6 +45,21 @@ def get_plot_colour_and_linestyle(scan_type: str):
         "GPU_NvidiaDecoupledLookback": ("tab:green", "solid"),
         "GPU_SimulateOptimalButIncorrect": ("lime", "dashed"),
     }.get(scan_type, ("grey", "dotted"))
+
+
+def write_result_to_cache(path: str, table: Dict[str, Dict[int, List[int]]]):
+    if os.path.exists(path):
+        warn(f"overwriting path {os.path.abspath(path)}")
+    with open(path, "w") as f:
+        f.write(str(table))
+
+
+def read_result_from_cache(path: str) -> Dict[str, Dict[int, List[int]]]:
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"couldn't open {os.path.abspath(path)}")
+    with open(path) as f:
+        text = f.read()
+    return ast.literal_eval(text)
 
 
 def chdir_to_top_level():
@@ -132,7 +148,14 @@ def plot_gpu_timings(avg_table: Dict[str, Dict[int, float]]):
     }
 
     for key, data_by_size in gpu_avg_table.items():
-        plt.plot(data_by_size.keys(), data_by_size.values(), label=key)
+        colour, linestyle = get_plot_colour_and_linestyle(key)
+        plt.plot(
+            data_by_size.keys(),
+            data_by_size.values(),
+            label=key,
+            color=colour,
+            linestyle=linestyle,
+        )
 
     plt.legend()
     plt.xlabel("Input Size")
@@ -154,6 +177,11 @@ def main():
     )
     parser.add_argument(
         "--repeats", type=int, default=10, help="Number of times the test is repeated"
+    )
+    parser.add_argument(
+        "--use-cached",
+        action="store_true",
+        help="Use a cached version of the results. Overrides all else",
     )
     parser.add_argument("--debug", "-d", action="store_true", help="Debug mode")
     parser.add_argument("--check", "-c", action="store_true", help="Check output")
@@ -186,11 +214,15 @@ def main():
         for key in COMMAND_LINE_SCAN_TYPES
     }
 
-    for key in table:
-        for size in table[key]:
-            table[key][size] = run_and_time_main(
-                key, size, repeats, debug_mode, check_output
-            )
+    if args.use_cached:
+        table = read_result_from_cache("cache.txt")
+    else:
+        for key in table:
+            for size in table[key]:
+                table[key][size] = run_and_time_main(
+                    key, size, repeats, debug_mode, check_output
+                )
+        write_result_to_cache("cache.txt", table)
 
     avg_table = postprocess_experiment_data(table)
 
