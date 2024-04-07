@@ -51,12 +51,12 @@ impl_optimal_but_incorrect_gpu(const int32_t *d_input,
                                size_t size);
 
 enum class InclusiveScanType {
-    CPU_SerialBaseline,
-    CPU_ParallelBaseline,
+    CPU_Serial,
+    CPU_Parallel,
     CPU_SimulateOptimalButIncorrect,
     GPU_Serial,
     GPU_NaiveHierarchical,
-    GPU_OptimizedBaseline,
+    GPU_OptimizedHierarchical,
     GPU_OurDecoupledLookback,
     GPU_NvidiaDecoupledLookback,
     GPU_SimulateOptimalButIncorrect,
@@ -65,14 +65,14 @@ enum class InclusiveScanType {
 // I just use this as an associative array
 std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
     // CPU Algorithms
-    {"CPU_SerialBaseline", InclusiveScanType::CPU_SerialBaseline},
-    {"CPU_ParallelBaseline", InclusiveScanType::CPU_ParallelBaseline},
+    {"CPU_Serial", InclusiveScanType::CPU_Serial},
+    {"CPU_Parallel", InclusiveScanType::CPU_Parallel},
     {"CPU_SimulateOptimalButIncorrect",
      InclusiveScanType::CPU_SimulateOptimalButIncorrect},
     // GPU Algorithms
     {"GPU_Serial", InclusiveScanType::GPU_Serial},
     {"GPU_NaiveHierarchical", InclusiveScanType::GPU_NaiveHierarchical},
-    {"GPU_OptimizedBaseline", InclusiveScanType::GPU_OptimizedBaseline},
+    {"GPU_OptimizedHierarchical", InclusiveScanType::GPU_OptimizedHierarchical},
     {"GPU_OurDecoupledLookback", InclusiveScanType::GPU_OurDecoupledLookback},
     {"GPU_NvidiaDecoupledLookback",
      InclusiveScanType::GPU_NvidiaDecoupledLookback},
@@ -85,7 +85,7 @@ is_gpu_algorithm(InclusiveScanType scan_type)
 {
     return (scan_type == InclusiveScanType::GPU_Serial ||
             scan_type == InclusiveScanType::GPU_NaiveHierarchical ||
-            scan_type == InclusiveScanType::GPU_OptimizedBaseline ||
+            scan_type == InclusiveScanType::GPU_OptimizedHierarchical ||
             scan_type == InclusiveScanType::GPU_OurDecoupledLookback ||
             scan_type == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
             scan_type == InclusiveScanType::GPU_SimulateOptimalButIncorrect);
@@ -107,7 +107,7 @@ struct CommandLineArguments {
     std::string exe_ = "?";
     // TODO(dchu)   Make these values into macros or somehow deduplicate the
     //              references to them!
-    InclusiveScanType type_ = InclusiveScanType::GPU_OptimizedBaseline;
+    InclusiveScanType type_ = InclusiveScanType::GPU_OptimizedHierarchical;
     int size_ = 1000;
     int repeats_ = 1;
     bool check_ = false;
@@ -218,7 +218,7 @@ CommandLineArguments::print_help()
         std::cout << str << ",";
     }
     // Delete the trailing comma from the previous print-statement
-    std::cout << "\b}. Default: GPU_OptimizedBaseline" << std::endl;
+    std::cout << "\b}. Default: GPU_OptimizedHierarchical" << std::endl;
     std::cout << "    -s, --size <input-size>: number of input elements, 1..= "
                  "~1_000_000_000. Default: 1000"
               << std::endl;
@@ -352,10 +352,10 @@ main(int argc, char *argv[])
     for (int i = 0; i < cmd_args.repeats_; ++i) {
         const double start_time = get_time_in_seconds();
         switch (cmd_args.type_) {
-        case InclusiveScanType::CPU_SerialBaseline:
+        case InclusiveScanType::CPU_Serial:
             impl_serial_cpu_baseline(h_input.data(), h_output, num_elems);
             break;
-        case InclusiveScanType::CPU_ParallelBaseline:
+        case InclusiveScanType::CPU_Parallel:
             impl_parallel_cpu_baseline(h_input.data(), h_output, num_elems, 16);
             break;
         case InclusiveScanType::CPU_SimulateOptimalButIncorrect:
@@ -375,7 +375,7 @@ main(int argc, char *argv[])
         case InclusiveScanType::GPU_NaiveHierarchical:
             impl_naive_hierarchical(d_input, d_output, num_elems);
             break;
-        case InclusiveScanType::GPU_OptimizedBaseline:
+        case InclusiveScanType::GPU_OptimizedHierarchical:
             impl_baseline(d_input, d_output, num_elems);
             break;
 

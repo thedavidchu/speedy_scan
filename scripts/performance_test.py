@@ -13,11 +13,11 @@ import matplotlib.pyplot as plt
 # NOTE  I rely on these names being prefixed with either "CPU_" or
 #       "GPU_" to filter based on the hardware type.
 COMMAND_LINE_SCAN_TYPES = [
-    "CPU_SerialBaseline",
-    "CPU_ParallelBaseline",
+    "CPU_Serial",
+    "CPU_Parallel",
     "CPU_SimulateOptimalButIncorrect",
     "GPU_NaiveHierarchical",
-    "GPU_OptimizedBaseline",
+    "GPU_OptimizedHierarchical",
     "GPU_OurDecoupledLookback",
     "GPU_NvidiaDecoupledLookback",
     "GPU_SimulateOptimalButIncorrect",
@@ -36,11 +36,11 @@ COMMAND_LINE_INPUT_SIZES = [
 def get_plot_colour_and_linestyle(scan_type: str):
     """Return the Matplotlib colour and linestyle for a scan type."""
     return {
-        "CPU_SerialBaseline": ("tab:blue", "solid"),
-        "CPU_ParallelBaseline": ("tab:purple", "solid"),
+        "CPU_Serial": ("tab:blue", "solid"),
+        "CPU_Parallel": ("tab:purple", "solid"),
         "CPU_SimulateOptimalButIncorrect": ("tab:cyan", "dashed"),
         "GPU_NaiveHierarchical": ("tab:red", "solid"),
-        "GPU_OptimizedBaseline": ("tab:orange", "solid"),
+        "GPU_OptimizedHierarchical": ("tab:orange", "solid"),
         "GPU_OurDecoupledLookback": ("yellow", "solid"),
         "GPU_NvidiaDecoupledLookback": ("tab:green", "solid"),
         "GPU_SimulateOptimalButIncorrect": ("lime", "dashed"),
