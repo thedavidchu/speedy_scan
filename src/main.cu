@@ -19,6 +19,12 @@ extern void
 impl_serial_cpu_baseline(const int32_t *input, int32_t *output, size_t size);
 
 extern void
+impl_parallel_cpu_baseline(const int32_t *h_input,
+                           int32_t *h_output,
+                           size_t size,
+                           unsigned num_workers);
+
+extern void
 impl_baseline(const int32_t *input, int32_t *output, size_t size);
 
 extern void
@@ -277,7 +283,7 @@ main(int argc, char *argv[])
             impl_serial_cpu_baseline(h_input.data(), h_output, num_elems);
             break;
         case InclusiveScanType::ParallelCPUBaseline:
-            assert(0 && "not implemented");
+            impl_parallel_cpu_baseline(h_input.data(), h_output, num_elems, 16);
             break;
         case InclusiveScanType::Baseline:
             impl_baseline(d_input, d_output, num_elems);
