@@ -16,13 +16,13 @@
 
 // defined in each of the implementations
 extern void
-impl_serial_cpu_baseline(const int32_t *input, int32_t *output, size_t size);
+impl_serial_cpu(const int32_t *input, int32_t *output, size_t size);
 
 extern void
-impl_parallel_cpu_baseline(const int32_t *h_input,
-                           int32_t *h_output,
-                           size_t size,
-                           unsigned num_workers);
+impl_parallel_cpu(const int32_t *h_input,
+                  int32_t *h_output,
+                  size_t size,
+                  unsigned num_workers);
 
 extern void
 impl_simulate_optimal_but_incorrect_cpu(const int32_t *h_input,
@@ -34,21 +34,27 @@ extern void
 impl_serial_gpu(const int32_t *d_input, int32_t *d_output, size_t size);
 
 void
-impl_naive_hierarchical(const int32_t *d_input, int32_t *d_output, size_t size);
+impl_naive_hierarchical_gpu(const int32_t *d_input,
+                            int32_t *d_output,
+                            size_t size);
 
 extern void
-impl_baseline(const int32_t *input, int32_t *output, size_t size);
+impl_optimized_hierarchical_gpu(const int32_t *input,
+                                int32_t *output,
+                                size_t size);
 
 extern void
-impl_decoupled_lookback(const int32_t *input, int32_t *output, size_t size);
+impl_our_decoupled_lookback(const int32_t *input, int32_t *output, size_t size);
 
 extern void
-impl_nvidia(const int32_t *input, int32_t *output, size_t size);
-
-extern void
-impl_optimal_but_incorrect_gpu(const int32_t *d_input,
-                               int32_t *d_output,
+impl_nvidia_decoupled_lookback(const int32_t *input,
+                               int32_t *output,
                                size_t size);
+
+extern void
+impl_simulate_optimal_but_incorrect_gpu(const int32_t *d_input,
+                                        int32_t *d_output,
+                                        size_t size);
 
 enum class InclusiveScanType {
     CPU_Serial,
@@ -353,10 +359,10 @@ main(int argc, char *argv[])
         const double start_time = get_time_in_seconds();
         switch (cmd_args.type_) {
         case InclusiveScanType::CPU_Serial:
-            impl_serial_cpu_baseline(h_input.data(), h_output, num_elems);
+            impl_serial_cpu(h_input.data(), h_output, num_elems);
             break;
         case InclusiveScanType::CPU_Parallel:
-            impl_parallel_cpu_baseline(h_input.data(), h_output, num_elems, 16);
+            impl_parallel_cpu(h_input.data(), h_output, num_elems, 16);
             break;
         case InclusiveScanType::CPU_SimulateOptimalButIncorrect:
             if (cmd_args.check_) {
@@ -373,18 +379,18 @@ main(int argc, char *argv[])
             impl_serial_gpu(d_input, d_output, num_elems);
             break;
         case InclusiveScanType::GPU_NaiveHierarchical:
-            impl_naive_hierarchical(d_input, d_output, num_elems);
+            impl_naive_hierarchical_gpu(d_input, d_output, num_elems);
             break;
         case InclusiveScanType::GPU_OptimizedHierarchical:
-            impl_baseline(d_input, d_output, num_elems);
+            impl_optimized_hierarchical_gpu(d_input, d_output, num_elems);
             break;
 
         case InclusiveScanType::GPU_OurDecoupledLookback:
-            impl_decoupled_lookback(d_input, d_output, num_elems);
+            impl_our_decoupled_lookback(d_input, d_output, num_elems);
             break;
 
         case InclusiveScanType::GPU_NvidiaDecoupledLookback:
-            impl_nvidia(d_input, d_output, num_elems);
+            impl_nvidia_decoupled_lookback(d_input, d_output, num_elems);
             break;
 
         case InclusiveScanType::GPU_SimulateOptimalButIncorrect:
@@ -393,7 +399,9 @@ main(int argc, char *argv[])
                               "the correct answer; it merely simulates the "
                               "optimal timing with a memcpy!");
             }
-            impl_optimal_but_incorrect_gpu(d_input, d_output, num_elems);
+            impl_simulate_optimal_but_incorrect_gpu(d_input,
+                                                    d_output,
+                                                    num_elems);
             break;
         default:
             print_error("unrecognized scan type!");

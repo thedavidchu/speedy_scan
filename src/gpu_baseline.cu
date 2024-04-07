@@ -54,13 +54,18 @@ impl_serial_gpu(const int32_t *d_input, int32_t *d_output, size_t size)
 
 /// @brief  Naive parallel implementation for input sizes no larger than 1024.
 ///
-/// Source: https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
+/// Source:
+/// https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
 __global__ void
-naive_parallel(const int32_t *d_input, int32_t *d_output, size_t size, int32_t *reductions)
+naive_parallel(const int32_t *d_input,
+               int32_t *d_output,
+               size_t size,
+               int32_t *reductions)
 {
     constexpr int NUM_THREADS = 1024;
     // To use shared memory, you need to indicate its size either at compile
-    // time or runtime. Source: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#execution-configuration
+    // time or runtime. Source:
+    // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#execution-configuration
     __shared__ int32_t double_buffer[2 * NUM_THREADS];
     int32_t *input_buffer = &double_buffer[0];
     int32_t *output_buffer = &double_buffer[NUM_THREADS];
@@ -80,8 +85,10 @@ naive_parallel(const int32_t *d_input, int32_t *d_output, size_t size, int32_t *
             output_buffer[t_id] = input_buffer[t_id];
         } else {
             // Could be optimized by writing the values to the output_buffer in
-            // the first place. Then, we only need to access two memory locations.
-            output_buffer[t_id] = input_buffer[t_id] + input_buffer[t_id - offset];
+            // the first place. Then, we only need to access two memory
+            // locations.
+            output_buffer[t_id] =
+                input_buffer[t_id] + input_buffer[t_id - offset];
         }
         // Swap double buffers. N.B. std::swap cannot be called from device.
         int32_t *tmp = input_buffer;
@@ -101,7 +108,9 @@ naive_parallel(const int32_t *d_input, int32_t *d_output, size_t size, int32_t *
 }
 
 __global__ void
-add_to_all_1024(int32_t *const d_output, size_t const size, int32_t const *const max_of_blocks)
+add_to_all_1024(int32_t *const d_output,
+                size_t const size,
+                int32_t const *const max_of_blocks)
 {
     // Start from the 2nd block, because the first doesn't need anything added!
     const int dst_idx = (blockIdx.x + 1) * blockDim.x + threadIdx.x;
@@ -121,16 +130,19 @@ naive_hierarchical_scan(const int32_t *d_input, int32_t *d_output, size_t size)
     size_t num_blocks = CEIL_DIV(size, MAX_THREADS);
     if (size > 1024) {
         int32_t *reductions = NULL;
-        cuda_check(cudaMalloc((void **)&reductions,
-                                       num_blocks * sizeof(int32_t)));
-        naive_parallel<<<num_blocks, MAX_THREADS>>>(d_input, d_output, size, reductions);
+        cuda_check(
+            cudaMalloc((void **)&reductions, num_blocks * sizeof(int32_t)));
+        naive_parallel<<<num_blocks, MAX_THREADS>>>(d_input,
+                                                    d_output,
+                                                    size,
+                                                    reductions);
         cudaDeviceSynchronize();
         // Perform scan on reductions
         naive_hierarchical_scan(reductions, reductions, num_blocks);
         // Add scan to blocks
         add_to_all_1024<<<num_blocks - 1, MAX_THREADS>>>(d_output,
-                                                             size,
-                                                             reductions);
+                                                         size,
+                                                         reductions);
         cudaDeviceSynchronize();
         cuda_check(cudaFree(reductions));
     } else {
@@ -139,7 +151,9 @@ naive_hierarchical_scan(const int32_t *d_input, int32_t *d_output, size_t size)
     }
 }
 void
-impl_naive_hierarchical(const int32_t *d_input, int32_t *d_output, size_t size)
+impl_naive_hierarchical_gpu(const int32_t *d_input,
+                            int32_t *d_output,
+                            size_t size)
 {
     if (size > std::numeric_limits<uint32_t>::max())
         printf("oh no, too many elements ):\n");
@@ -346,7 +360,9 @@ hierarchical_scan(const int32_t *d_input, int32_t *d_output, size_t size)
 }
 
 void
-impl_baseline(const int32_t *d_input, int32_t *d_output, size_t size)
+impl_optimized_hierarchical_gpu(const int32_t *d_input,
+                                int32_t *d_output,
+                                size_t size)
 {
     if (size > std::numeric_limits<uint32_t>::max())
         printf("oh no, too many elements ):\n");
@@ -361,9 +377,9 @@ impl_baseline(const int32_t *d_input, int32_t *d_output, size_t size)
 ////////////////////////////////////////////////////////////////////////////////
 
 void
-impl_optimal_but_incorrect_gpu(const int32_t *d_input,
-                               int32_t *d_output,
-                               size_t size)
+impl_simulate_optimal_but_incorrect_gpu(const int32_t *d_input,
+                                        int32_t *d_output,
+                                        size_t size)
 {
     if (size > std::numeric_limits<uint32_t>::max())
         printf("oh no, too many elements ):\n");

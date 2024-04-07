@@ -248,7 +248,9 @@ __launch_bounds__(CHUNK_SIZE) void kernel(const int32_t *restrict in,
 }
 
 void
-impl_decoupled_lookback(const int32_t *d_input, int32_t *d_output, size_t size)
+impl_our_decoupled_lookback(const int32_t *d_input,
+                            int32_t *d_output,
+                            size_t size)
 {
     if (size > std::numeric_limits<uint32_t>::max())
         printf("oh no, too many elements ):\n");
