@@ -13,7 +13,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 void
-impl_serial_cpu_baseline(const int32_t *h_input, int32_t *h_output, size_t size)
+impl_serial_cpu(const int32_t *h_input, int32_t *h_output, size_t size)
 {
     int32_t ans = 0;
     for (size_t i = 0; i < size; ++i) {
@@ -38,7 +38,7 @@ partion_scan(int32_t const *const h_input,
     const size_t work_length = end_id - start_id;
 
     // Add inside thread's partition
-    impl_serial_cpu_baseline(&h_input[start_id],
+    impl_serial_cpu(&h_input[start_id],
                              &h_output[start_id],
                              work_length);
 }
@@ -80,7 +80,7 @@ add_reduction(int32_t *const h_output,
 }
 
 void
-impl_parallel_cpu_baseline(const int32_t *h_input,
+impl_parallel_cpu(const int32_t *h_input,
                            int32_t *h_output,
                            size_t size,
                            unsigned num_workers)

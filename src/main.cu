@@ -5,8 +5,8 @@
 #include <cstring>
 #include <iostream>
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include <stdio.h>
 #include <sys/time.h>
@@ -16,13 +16,13 @@
 
 // defined in each of the implementations
 extern void
-impl_serial_cpu_baseline(const int32_t *input, int32_t *output, size_t size);
+impl_serial_cpu(const int32_t *input, int32_t *output, size_t size);
 
 extern void
-impl_parallel_cpu_baseline(const int32_t *h_input,
-                           int32_t *h_output,
-                           size_t size,
-                           unsigned num_workers);
+impl_parallel_cpu(const int32_t *h_input,
+                  int32_t *h_output,
+                  size_t size,
+                  unsigned num_workers);
 
 extern void
 impl_simulate_optimal_but_incorrect_cpu(const int32_t *h_input,
@@ -33,24 +33,36 @@ impl_simulate_optimal_but_incorrect_cpu(const int32_t *h_input,
 extern void
 impl_serial_gpu(const int32_t *d_input, int32_t *d_output, size_t size);
 
-extern void
-impl_baseline(const int32_t *input, int32_t *output, size_t size);
+void
+impl_naive_hierarchical_gpu(const int32_t *d_input,
+                            int32_t *d_output,
+                            size_t size);
 
 extern void
-impl_decoupled_lookback(const int32_t *input, int32_t *output, size_t size);
+impl_optimized_hierarchical_gpu(const int32_t *input,
+                                int32_t *output,
+                                size_t size);
 
 extern void
-impl_nvidia(const int32_t *input, int32_t *output, size_t size);
+impl_our_decoupled_lookback(const int32_t *input, int32_t *output, size_t size);
 
 extern void
-impl_optimal_but_incorrect_gpu(const int32_t *d_input, int32_t *d_output, size_t size);
+impl_nvidia_decoupled_lookback(const int32_t *input,
+                               int32_t *output,
+                               size_t size);
+
+extern void
+impl_simulate_optimal_but_incorrect_gpu(const int32_t *d_input,
+                                        int32_t *d_output,
+                                        size_t size);
 
 enum class InclusiveScanType {
-    CPU_SerialBaseline,
-    CPU_ParallelBaseline,
+    CPU_Serial,
+    CPU_Parallel,
     CPU_SimulateOptimalButIncorrect,
     GPU_Serial,
-    GPU_OptimizedBaseline,
+    GPU_NaiveHierarchical,
+    GPU_OptimizedHierarchical,
     GPU_OurDecoupledLookback,
     GPU_NvidiaDecoupledLookback,
     GPU_SimulateOptimalButIncorrect,
@@ -59,15 +71,17 @@ enum class InclusiveScanType {
 // I just use this as an associative array
 std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
     // CPU Algorithms
-    {"CPU_SerialBaseline", InclusiveScanType::CPU_SerialBaseline},
-    {"CPU_ParallelBaseline", InclusiveScanType::CPU_ParallelBaseline},
+    {"CPU_Serial", InclusiveScanType::CPU_Serial},
+    {"CPU_Parallel", InclusiveScanType::CPU_Parallel},
     {"CPU_SimulateOptimalButIncorrect",
      InclusiveScanType::CPU_SimulateOptimalButIncorrect},
     // GPU Algorithms
     {"GPU_Serial", InclusiveScanType::GPU_Serial},
-    {"GPU_OptimizedBaseline", InclusiveScanType::GPU_OptimizedBaseline},
+    {"GPU_NaiveHierarchical", InclusiveScanType::GPU_NaiveHierarchical},
+    {"GPU_OptimizedHierarchical", InclusiveScanType::GPU_OptimizedHierarchical},
     {"GPU_OurDecoupledLookback", InclusiveScanType::GPU_OurDecoupledLookback},
-    {"GPU_NvidiaDecoupledLookback", InclusiveScanType::GPU_NvidiaDecoupledLookback},
+    {"GPU_NvidiaDecoupledLookback",
+     InclusiveScanType::GPU_NvidiaDecoupledLookback},
     {"GPU_SimulateOptimalButIncorrect",
      InclusiveScanType::GPU_SimulateOptimalButIncorrect},
 };
@@ -75,13 +89,12 @@ std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
 static bool
 is_gpu_algorithm(InclusiveScanType scan_type)
 {
-    return (
-        scan_type == InclusiveScanType::GPU_Serial ||
-        scan_type == InclusiveScanType::GPU_OptimizedBaseline ||
-        scan_type == InclusiveScanType::GPU_OurDecoupledLookback ||
-        scan_type == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
-        scan_type == InclusiveScanType::GPU_SimulateOptimalButIncorrect
-    );
+    return (scan_type == InclusiveScanType::GPU_Serial ||
+            scan_type == InclusiveScanType::GPU_NaiveHierarchical ||
+            scan_type == InclusiveScanType::GPU_OptimizedHierarchical ||
+            scan_type == InclusiveScanType::GPU_OurDecoupledLookback ||
+            scan_type == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
+            scan_type == InclusiveScanType::GPU_SimulateOptimalButIncorrect);
 }
 
 static void
@@ -100,7 +113,7 @@ struct CommandLineArguments {
     std::string exe_ = "?";
     // TODO(dchu)   Make these values into macros or somehow deduplicate the
     //              references to them!
-    InclusiveScanType type_ = InclusiveScanType::GPU_OptimizedBaseline;
+    InclusiveScanType type_ = InclusiveScanType::GPU_OptimizedHierarchical;
     int size_ = 1000;
     int repeats_ = 1;
     bool check_ = false;
@@ -211,7 +224,7 @@ CommandLineArguments::print_help()
         std::cout << str << ",";
     }
     // Delete the trailing comma from the previous print-statement
-    std::cout << "\b}. Default: GPU_OptimizedBaseline" << std::endl;
+    std::cout << "\b}. Default: GPU_OptimizedHierarchical" << std::endl;
     std::cout << "    -s, --size <input-size>: number of input elements, 1..= "
                  "~1_000_000_000. Default: 1000"
               << std::endl;
@@ -252,11 +265,13 @@ CommandLineArguments::parse_positive_int(char *arg)
     //      such as '1e12' being interpreted as '1'.
     x = strtol(arg, NULL, 10);
     if (x > INT_MAX) {
-        print_error("'" + std::string(arg) + "' is out of range (max int is " + std::to_string(INT_MAX) + ")!");
+        print_error("'" + std::string(arg) + "' is out of range (max int is " +
+                    std::to_string(INT_MAX) + ")!");
         print_help();
         exit(-1);
-    } else if (x <= 0) {    // Unparseable non-integers will trigger this
-        print_error("got '" + std::string(arg) + "', expecting positive, integer value!");
+    } else if (x <= 0) { // Unparseable non-integers will trigger this
+        print_error("got '" + std::string(arg) +
+                    "', expecting positive, integer value!");
         print_help();
         exit(-1);
     }
@@ -326,28 +341,28 @@ main(int argc, char *argv[])
     int32_t *d_output = nullptr;
     if (is_gpu_algorithm(cmd_args.type_)) {
         cuda_check(cudaMalloc((void **)&d_input, array_size_in_bytes),
-                "cudaMalloc(d_input)");
+                   "cudaMalloc(d_input)");
         cuda_check(cudaMalloc((void **)&d_output, array_size_in_bytes),
-                "cudaMalloc(d_output)");
+                   "cudaMalloc(d_output)");
     }
 
     // Copy input from host to device
     if (is_gpu_algorithm(cmd_args.type_)) {
         cuda_check(cudaMemcpy(d_input,
-                            h_input.data(),
-                            array_size_in_bytes,
-                            cudaMemcpyHostToDevice),
-                "cudaMemcpy(H2D)");
+                              h_input.data(),
+                              array_size_in_bytes,
+                              cudaMemcpyHostToDevice),
+                   "cudaMemcpy(H2D)");
     }
 
     for (int i = 0; i < cmd_args.repeats_; ++i) {
         const double start_time = get_time_in_seconds();
         switch (cmd_args.type_) {
-        case InclusiveScanType::CPU_SerialBaseline:
-            impl_serial_cpu_baseline(h_input.data(), h_output, num_elems);
+        case InclusiveScanType::CPU_Serial:
+            impl_serial_cpu(h_input.data(), h_output, num_elems);
             break;
-        case InclusiveScanType::CPU_ParallelBaseline:
-            impl_parallel_cpu_baseline(h_input.data(), h_output, num_elems, 16);
+        case InclusiveScanType::CPU_Parallel:
+            impl_parallel_cpu(h_input.data(), h_output, num_elems, 16);
             break;
         case InclusiveScanType::CPU_SimulateOptimalButIncorrect:
             if (cmd_args.check_) {
@@ -363,16 +378,19 @@ main(int argc, char *argv[])
         case InclusiveScanType::GPU_Serial:
             impl_serial_gpu(d_input, d_output, num_elems);
             break;
-        case InclusiveScanType::GPU_OptimizedBaseline:
-            impl_baseline(d_input, d_output, num_elems);
+        case InclusiveScanType::GPU_NaiveHierarchical:
+            impl_naive_hierarchical_gpu(d_input, d_output, num_elems);
+            break;
+        case InclusiveScanType::GPU_OptimizedHierarchical:
+            impl_optimized_hierarchical_gpu(d_input, d_output, num_elems);
             break;
 
         case InclusiveScanType::GPU_OurDecoupledLookback:
-            impl_decoupled_lookback(d_input, d_output, num_elems);
+            impl_our_decoupled_lookback(d_input, d_output, num_elems);
             break;
 
         case InclusiveScanType::GPU_NvidiaDecoupledLookback:
-            impl_nvidia(d_input, d_output, num_elems);
+            impl_nvidia_decoupled_lookback(d_input, d_output, num_elems);
             break;
 
         case InclusiveScanType::GPU_SimulateOptimalButIncorrect:
@@ -381,7 +399,7 @@ main(int argc, char *argv[])
                               "the correct answer; it merely simulates the "
                               "optimal timing with a memcpy!");
             }
-            impl_optimal_but_incorrect_gpu(d_input,
+            impl_simulate_optimal_but_incorrect_gpu(d_input,
                                                     d_output,
                                                     num_elems);
             break;

@@ -15,3 +15,4 @@ test_uniform_random
 
 # Results
 performance-timings.png
+performance-timings-gpu-only.png
