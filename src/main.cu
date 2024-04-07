@@ -4,9 +4,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <map>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include <stdio.h>
 #include <sys/time.h>
@@ -40,23 +40,25 @@ extern void
 impl_nvidia(const int32_t *input, int32_t *output, size_t size);
 
 enum class InclusiveScanType {
-    SerialCPUBaseline,
-    ParallelCPUBaseline,
-    SimulateOptimalButIncorrectCPU,
-    Baseline,
-    DecoupledLookback,
-    NvidiaScan
+    CPU_SerialBaseline,
+    CPU_ParallelBaseline,
+    CPU_SimulateOptimalButIncorrect,
+    GPU_OptimizedBaseline,
+    GPU_OurDecoupledLookback,
+    GPU_NvidiaDecoupledLookback,
 };
 
 // I just use this as an associative array
-std::map<std::string, InclusiveScanType> scan_types = {
-    {"Baseline", InclusiveScanType::Baseline},
-    {"SerialCPUBaseline", InclusiveScanType::SerialCPUBaseline},
-    {"ParallelCPUBaseline", InclusiveScanType::ParallelCPUBaseline},
-    {"SimulateOptimalButIncorrectCPU",
-     InclusiveScanType::SimulateOptimalButIncorrectCPU},
-    {"DecoupledLookback", InclusiveScanType::DecoupledLookback},
-    {"NvidiaScan", InclusiveScanType::NvidiaScan},
+std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
+    // CPU Algorithms
+    {"CPU_SerialBaseline", InclusiveScanType::CPU_SerialBaseline},
+    {"CPU_ParallelBaseline", InclusiveScanType::CPU_ParallelBaseline},
+    {"CPU_SimulateOptimalButIncorrect",
+     InclusiveScanType::CPU_SimulateOptimalButIncorrect},
+    // GPU Algorithms
+    {"GPU_OptimizedBaseline", InclusiveScanType::GPU_OptimizedBaseline},
+    {"GPU_OurDecoupledLookback", InclusiveScanType::GPU_OurDecoupledLookback},
+    {"GPU_NvidiaDecoupledLookback", InclusiveScanType::GPU_NvidiaDecoupledLookback},
 };
 
 static void
@@ -75,7 +77,7 @@ struct CommandLineArguments {
     std::string exe_ = "?";
     // TODO(dchu)   Make these values into macros or somehow deduplicate the
     //              references to them!
-    InclusiveScanType type_ = InclusiveScanType::Baseline;
+    InclusiveScanType type_ = InclusiveScanType::GPU_OptimizedBaseline;
     int size_ = 1000;
     int repeats_ = 1;
     bool check_ = false;
@@ -186,7 +188,7 @@ CommandLineArguments::print_help()
         std::cout << str << ",";
     }
     // Delete the trailing comma from the previous print-statement
-    std::cout << "\b}. Default: Baseline" << std::endl;
+    std::cout << "\b}. Default: GPU_OptimizedBaseline" << std::endl;
     std::cout << "    -s, --size <input-size>: number of input elements, 1..= "
                  "~1_000_000_000. Default: 1000"
               << std::endl;
@@ -312,15 +314,15 @@ main(int argc, char *argv[])
     for (int i = 0; i < cmd_args.repeats_; ++i) {
         const double start_time = get_time_in_seconds();
         switch (cmd_args.type_) {
-        case InclusiveScanType::SerialCPUBaseline:
+        case InclusiveScanType::CPU_SerialBaseline:
             impl_serial_cpu_baseline(h_input.data(), h_output, num_elems);
             break;
-        case InclusiveScanType::ParallelCPUBaseline:
+        case InclusiveScanType::CPU_ParallelBaseline:
             impl_parallel_cpu_baseline(h_input.data(), h_output, num_elems, 16);
             break;
-        case InclusiveScanType::SimulateOptimalButIncorrectCPU:
+        case InclusiveScanType::CPU_SimulateOptimalButIncorrect:
             if (cmd_args.check_) {
-                print_warning("SimulateOptimalButIncorrectCPU does not return "
+                print_warning("CPU_SimulateOptimalButIncorrect does not return "
                               "the correct answer; it merely simulates the "
                               "optimal timing with a memcpy!");
             }
@@ -329,15 +331,15 @@ main(int argc, char *argv[])
                                                     num_elems,
                                                     16);
             break;
-        case InclusiveScanType::Baseline:
+        case InclusiveScanType::GPU_OptimizedBaseline:
             impl_baseline(d_input, d_output, num_elems);
             break;
 
-        case InclusiveScanType::DecoupledLookback:
+        case InclusiveScanType::GPU_OurDecoupledLookback:
             impl_decoupled_lookback(d_input, d_output, num_elems);
             break;
 
-        case InclusiveScanType::NvidiaScan:
+        case InclusiveScanType::GPU_NvidiaDecoupledLookback:
             impl_nvidia(d_input, d_output, num_elems);
             break;
 
@@ -351,9 +353,9 @@ main(int argc, char *argv[])
     }
 
     // Copy output from device to host
-    if (cmd_args.type_ == InclusiveScanType::Baseline ||
-        cmd_args.type_ == InclusiveScanType::DecoupledLookback ||
-        cmd_args.type_ == InclusiveScanType::NvidiaScan) {
+    if (cmd_args.type_ == InclusiveScanType::GPU_OptimizedBaseline ||
+        cmd_args.type_ == InclusiveScanType::GPU_OurDecoupledLookback ||
+        cmd_args.type_ == InclusiveScanType::GPU_NvidiaDecoupledLookback) {
         cuda_check(
             cudaHostAlloc(&h_output, array_size_in_bytes, cudaHostAllocDefault),
             "cudaHostAlloc(h_output)");

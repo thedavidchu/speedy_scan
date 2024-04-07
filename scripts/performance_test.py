@@ -10,11 +10,12 @@ import matplotlib.pyplot as plt
 
 
 COMMAND_LINE_SCAN_TYPES = [
-    "SerialCPUBaseline",
-    # "ParallelCPUBaseline",
-    "Baseline",
-    "DecoupledLookback",
-    "NvidiaScan",
+    "CPU_SerialBaseline",
+    "CPU_ParallelBaseline",
+    "CPU_SimulateOptimalButIncorrect",
+    "GPU_OptimizedBaseline",
+    "GPU_OurDecoupledLookback",
+    "GPU_NvidiaDecoupledLookback",
 ]
 COMMAND_LINE_INPUT_SIZES = [
     1_000,
@@ -25,7 +26,7 @@ COMMAND_LINE_INPUT_SIZES = [
     100_000_000,
     1_000_000_000,
 ]
-
+REPEATS: int = 1
 
 def chdir_to_top_level():
     out = run(
@@ -53,7 +54,7 @@ def run_and_time_main(
             "--size",
             f"{size}",
             "--repeats",
-            "10",
+            f"{REPEATS}",
             # Add optional arguments
             *(["--debug"] if debug_mode else []),
             *(["--check"] if check_output else []),
