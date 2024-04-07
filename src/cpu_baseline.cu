@@ -132,3 +132,47 @@ impl_parallel_cpu_baseline(const int32_t *h_input,
         worker.join();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+/// OPTIMAL PARALLEL CPU IMPLEMENTATION -- BUT INCORRECT (it's just a memcpy)
+////////////////////////////////////////////////////////////////////////////////
+
+static void
+optimal_but_incorrect_worker(const int32_t *h_input,
+                             int32_t *h_output,
+                             size_t size,
+                             unsigned worker_id,
+                             unsigned num_workers)
+{
+    const size_t start_id = worker_id * size / num_workers;
+    const size_t end_id = (worker_id + 1) * size / num_workers;
+    const size_t work_length = end_id - start_id;
+    memcpy(&h_output[start_id],
+           &h_input[start_id],
+           work_length * sizeof(int32_t));
+}
+
+void
+impl_optimal_but_incorrect_cpu_baseline(const int32_t *h_input,
+                                        int32_t *h_output,
+                                        size_t size,
+                                        unsigned num_workers)
+{
+    assert(h_input != NULL && "input must not be NULL");
+    assert(h_output != NULL && "output must not be NULL");
+    assert(num_workers > 0 && "must have non-zero workers");
+
+    std::vector<std::thread> workers;
+    for (unsigned w_id = 0; w_id < num_workers; ++w_id) {
+        workers.emplace_back(optimal_but_incorrect_worker,
+                             h_input,
+                             h_output,
+                             size,
+                             w_id,
+                             num_workers);
+    }
+
+    for (auto &worker : workers) {
+        worker.join();
+    }
+}

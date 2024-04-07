@@ -25,6 +25,12 @@ impl_parallel_cpu_baseline(const int32_t *h_input,
                            unsigned num_workers);
 
 extern void
+impl_optimal_but_incorrect_cpu_baseline(const int32_t *h_input,
+                                        int32_t *h_output,
+                                        size_t size,
+                                        unsigned num_workers);
+
+extern void
 impl_baseline(const int32_t *input, int32_t *output, size_t size);
 
 extern void
@@ -36,6 +42,7 @@ impl_nvidia(const int32_t *input, int32_t *output, size_t size);
 enum class InclusiveScanType {
     SerialCPUBaseline,
     ParallelCPUBaseline,
+    SimulateOptimalButIncorrectCPU,
     Baseline,
     DecoupledLookback,
     NvidiaScan
@@ -46,9 +53,17 @@ std::map<std::string, InclusiveScanType> scan_types = {
     {"Baseline", InclusiveScanType::Baseline},
     {"SerialCPUBaseline", InclusiveScanType::SerialCPUBaseline},
     {"ParallelCPUBaseline", InclusiveScanType::ParallelCPUBaseline},
+    {"SimulateOptimalButIncorrectCPU",
+     InclusiveScanType::SimulateOptimalButIncorrectCPU},
     {"DecoupledLookback", InclusiveScanType::DecoupledLookback},
     {"NvidiaScan", InclusiveScanType::NvidiaScan},
 };
+
+static void
+print_warning(std::string msg)
+{
+    std::cerr << "Warning: " << msg << std::endl;
+}
 
 static void
 print_error(std::string msg)
@@ -302,6 +317,17 @@ main(int argc, char *argv[])
             break;
         case InclusiveScanType::ParallelCPUBaseline:
             impl_parallel_cpu_baseline(h_input.data(), h_output, num_elems, 16);
+            break;
+        case InclusiveScanType::SimulateOptimalButIncorrectCPU:
+            if (cmd_args.check_) {
+                print_warning("SimulateOptimalButIncorrectCPU does not return "
+                              "the correct answer; it merely simulates the "
+                              "optimal timing with a memcpy!");
+            }
+            impl_optimal_but_incorrect_cpu_baseline(h_input.data(),
+                                                    h_output,
+                                                    num_elems,
+                                                    16);
             break;
         case InclusiveScanType::Baseline:
             impl_baseline(d_input, d_output, num_elems);
