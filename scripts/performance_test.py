@@ -97,9 +97,19 @@ def main():
     parser.add_argument(
         "--recompile", action="store_true", help="Recompile the executable"
     )
+    parser.add_argument("--cpu-only", action="store_true", help="Run only the CPU algorithms")
+    parser.add_argument("--gpu-only", action="store_true", help="Run only the GPU algorithms")
     parser.add_argument("--debug", "-d", action="store_true", help="Debug mode")
     parser.add_argument("--check", "-c", action="store_true", help="Check output")
     args = parser.parse_args()
+
+    global COMMAND_LINE_SCAN_TYPES
+    if args.cpu_only:
+        assert not args.gpu_only
+        COMMAND_LINE_SCAN_TYPES = [x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("CPU_")]
+    if args.gpu_only:
+        assert not args.cpu_only
+        COMMAND_LINE_SCAN_TYPES = [x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("GPU_")]
 
     debug_mode, check_output = args.debug, args.check
 
