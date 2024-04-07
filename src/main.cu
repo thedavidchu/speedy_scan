@@ -5,8 +5,8 @@
 #include <cstring>
 #include <iostream>
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include <stdio.h>
 #include <sys/time.h>
@@ -46,7 +46,9 @@ extern void
 impl_nvidia(const int32_t *input, int32_t *output, size_t size);
 
 extern void
-impl_optimal_but_incorrect_gpu(const int32_t *d_input, int32_t *d_output, size_t size);
+impl_optimal_but_incorrect_gpu(const int32_t *d_input,
+                               int32_t *d_output,
+                               size_t size);
 
 enum class InclusiveScanType {
     CPU_SerialBaseline,
@@ -72,7 +74,8 @@ std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
     {"GPU_NaiveHierarchical", InclusiveScanType::GPU_NaiveHierarchical},
     {"GPU_OptimizedBaseline", InclusiveScanType::GPU_OptimizedBaseline},
     {"GPU_OurDecoupledLookback", InclusiveScanType::GPU_OurDecoupledLookback},
-    {"GPU_NvidiaDecoupledLookback", InclusiveScanType::GPU_NvidiaDecoupledLookback},
+    {"GPU_NvidiaDecoupledLookback",
+     InclusiveScanType::GPU_NvidiaDecoupledLookback},
     {"GPU_SimulateOptimalButIncorrect",
      InclusiveScanType::GPU_SimulateOptimalButIncorrect},
 };
@@ -80,14 +83,12 @@ std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
 static bool
 is_gpu_algorithm(InclusiveScanType scan_type)
 {
-    return (
-        scan_type == InclusiveScanType::GPU_Serial ||
-        scan_type == InclusiveScanType::GPU_NaiveHierarchical ||
-        scan_type == InclusiveScanType::GPU_OptimizedBaseline ||
-        scan_type == InclusiveScanType::GPU_OurDecoupledLookback ||
-        scan_type == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
-        scan_type == InclusiveScanType::GPU_SimulateOptimalButIncorrect
-    );
+    return (scan_type == InclusiveScanType::GPU_Serial ||
+            scan_type == InclusiveScanType::GPU_NaiveHierarchical ||
+            scan_type == InclusiveScanType::GPU_OptimizedBaseline ||
+            scan_type == InclusiveScanType::GPU_OurDecoupledLookback ||
+            scan_type == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
+            scan_type == InclusiveScanType::GPU_SimulateOptimalButIncorrect);
 }
 
 static void
@@ -258,11 +259,13 @@ CommandLineArguments::parse_positive_int(char *arg)
     //      such as '1e12' being interpreted as '1'.
     x = strtol(arg, NULL, 10);
     if (x > INT_MAX) {
-        print_error("'" + std::string(arg) + "' is out of range (max int is " + std::to_string(INT_MAX) + ")!");
+        print_error("'" + std::string(arg) + "' is out of range (max int is " +
+                    std::to_string(INT_MAX) + ")!");
         print_help();
         exit(-1);
-    } else if (x <= 0) {    // Unparseable non-integers will trigger this
-        print_error("got '" + std::string(arg) + "', expecting positive, integer value!");
+    } else if (x <= 0) { // Unparseable non-integers will trigger this
+        print_error("got '" + std::string(arg) +
+                    "', expecting positive, integer value!");
         print_help();
         exit(-1);
     }
@@ -332,18 +335,18 @@ main(int argc, char *argv[])
     int32_t *d_output = nullptr;
     if (is_gpu_algorithm(cmd_args.type_)) {
         cuda_check(cudaMalloc((void **)&d_input, array_size_in_bytes),
-                "cudaMalloc(d_input)");
+                   "cudaMalloc(d_input)");
         cuda_check(cudaMalloc((void **)&d_output, array_size_in_bytes),
-                "cudaMalloc(d_output)");
+                   "cudaMalloc(d_output)");
     }
 
     // Copy input from host to device
     if (is_gpu_algorithm(cmd_args.type_)) {
         cuda_check(cudaMemcpy(d_input,
-                            h_input.data(),
-                            array_size_in_bytes,
-                            cudaMemcpyHostToDevice),
-                "cudaMemcpy(H2D)");
+                              h_input.data(),
+                              array_size_in_bytes,
+                              cudaMemcpyHostToDevice),
+                   "cudaMemcpy(H2D)");
     }
 
     for (int i = 0; i < cmd_args.repeats_; ++i) {
@@ -390,9 +393,7 @@ main(int argc, char *argv[])
                               "the correct answer; it merely simulates the "
                               "optimal timing with a memcpy!");
             }
-            impl_optimal_but_incorrect_gpu(d_input,
-                                                    d_output,
-                                                    num_elems);
+            impl_optimal_but_incorrect_gpu(d_input, d_output, num_elems);
             break;
         default:
             print_error("unrecognized scan type!");
