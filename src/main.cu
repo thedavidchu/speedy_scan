@@ -110,12 +110,27 @@ CommandLineArguments::CommandLineArguments(int argc, char *argv[])
     for (int i = 1; i < argc; ++i) {
         if (matches_str(argv[i], {"-t", "--type"})) {
             ++i;
+            if (i >= argc) {
+                print_error("expecting scan type!");
+                print_help();
+                exit(-1);
+            }
             this->type_ = parse_inclusive_scan_type(argv[i]);
         } else if (matches_str(argv[i], {"--size", "-s"})) {
             ++i;
+            if (i >= argc) {
+                print_error("expecting size!");
+                print_help();
+                exit(-1);
+            }
             this->size_ = parse_positive_int(argv[i]);
         } else if (matches_str(argv[i], {"--repeats", "-r"})) {
             ++i;
+            if (i >= argc) {
+                print_error("expecting repeats!");
+                print_help();
+                exit(-1);
+            }
             this->repeats_ = parse_positive_int(argv[i]);
         } else if (matches_str(argv[i], {"--check", "-c"})) {
             this->check_ = true;
@@ -126,7 +141,7 @@ CommandLineArguments::CommandLineArguments(int argc, char *argv[])
             exit(0);
         } else {
             // TODO(dchu): print out the unexpected argument that we received
-            print_error("unexpected argument");
+            print_error("unexpected argument: '" + std::string(argv[i]) + "'!");
             print_help();
             exit(-1);
         }
@@ -183,7 +198,7 @@ CommandLineArguments::parse_inclusive_scan_type(char *arg)
             return type;
         }
     }
-    print_error("unrecognized type");
+    print_error("unrecognized scan type: '" + std::string(arg) + "'!");
     print_help();
     exit(-1);
 }
@@ -192,13 +207,16 @@ int
 CommandLineArguments::parse_positive_int(char *arg)
 {
     long x = 0;
+    // NOTE This function strips leading whitespace and interprets until
+    //      it reaches an invalid value. This can create odd results,
+    //      such as '1e12' being interpreted as '1'.
     x = strtol(arg, NULL, 10);
     if (x > INT_MAX) {
-        print_error("out of range");
+        print_error("'" + std::string(arg) + "' is out of range!");
         print_help();
         exit(-1);
-    } else if (x == 0) {
-        print_error("expecting non-zero value");
+    } else if (x <= 0) {    // Unparseable non-integers will trigger this
+        print_error("got '" + std::string(arg) + "', expecting positive, integer value!");
         print_help();
         exit(-1);
     }
