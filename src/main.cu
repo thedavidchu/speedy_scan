@@ -31,6 +31,9 @@ impl_simulate_optimal_but_incorrect_cpu(const int32_t *h_input,
                                         unsigned num_workers);
 
 extern void
+impl_serial_gpu(const int32_t *d_input, int32_t *d_output, size_t size);
+
+extern void
 impl_baseline(const int32_t *input, int32_t *output, size_t size);
 
 extern void
@@ -46,6 +49,7 @@ enum class InclusiveScanType {
     CPU_SerialBaseline,
     CPU_ParallelBaseline,
     CPU_SimulateOptimalButIncorrect,
+    GPU_Serial,
     GPU_OptimizedBaseline,
     GPU_OurDecoupledLookback,
     GPU_NvidiaDecoupledLookback,
@@ -60,12 +64,25 @@ std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
     {"CPU_SimulateOptimalButIncorrect",
      InclusiveScanType::CPU_SimulateOptimalButIncorrect},
     // GPU Algorithms
+    {"GPU_Serial", InclusiveScanType::GPU_Serial},
     {"GPU_OptimizedBaseline", InclusiveScanType::GPU_OptimizedBaseline},
     {"GPU_OurDecoupledLookback", InclusiveScanType::GPU_OurDecoupledLookback},
     {"GPU_NvidiaDecoupledLookback", InclusiveScanType::GPU_NvidiaDecoupledLookback},
     {"GPU_SimulateOptimalButIncorrect",
      InclusiveScanType::GPU_SimulateOptimalButIncorrect},
 };
+
+static bool
+is_gpu_algorithm(InclusiveScanType scan_type)
+{
+    return (
+        scan_type == InclusiveScanType::GPU_Serial ||
+        scan_type == InclusiveScanType::GPU_OptimizedBaseline ||
+        scan_type == InclusiveScanType::GPU_OurDecoupledLookback ||
+        scan_type == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
+        scan_type == InclusiveScanType::GPU_SimulateOptimalButIncorrect
+    );
+}
 
 static void
 print_warning(std::string msg)
@@ -299,23 +316,29 @@ main(int argc, char *argv[])
 
     // Malloc CPU outputs
     int32_t *h_output = nullptr;
-    h_output = (int32_t *)malloc(array_size_in_bytes);
-    assert(h_output && "oom");
+    if (!is_gpu_algorithm(cmd_args.type_)) {
+        h_output = (int32_t *)malloc(array_size_in_bytes);
+        assert(h_output && "oom");
+    }
 
     // Allocate memory
     int32_t *d_input = nullptr;
     int32_t *d_output = nullptr;
-    cuda_check(cudaMalloc((void **)&d_input, array_size_in_bytes),
-               "cudaMalloc(d_input)");
-    cuda_check(cudaMalloc((void **)&d_output, array_size_in_bytes),
-               "cudaMalloc(d_output)");
+    if (is_gpu_algorithm(cmd_args.type_)) {
+        cuda_check(cudaMalloc((void **)&d_input, array_size_in_bytes),
+                "cudaMalloc(d_input)");
+        cuda_check(cudaMalloc((void **)&d_output, array_size_in_bytes),
+                "cudaMalloc(d_output)");
+    }
 
     // Copy input from host to device
-    cuda_check(cudaMemcpy(d_input,
-                          h_input.data(),
-                          array_size_in_bytes,
-                          cudaMemcpyHostToDevice),
-               "cudaMemcpy(H2D)");
+    if (is_gpu_algorithm(cmd_args.type_)) {
+        cuda_check(cudaMemcpy(d_input,
+                            h_input.data(),
+                            array_size_in_bytes,
+                            cudaMemcpyHostToDevice),
+                "cudaMemcpy(H2D)");
+    }
 
     for (int i = 0; i < cmd_args.repeats_; ++i) {
         const double start_time = get_time_in_seconds();
@@ -336,6 +359,9 @@ main(int argc, char *argv[])
                                                     h_output,
                                                     num_elems,
                                                     16);
+            break;
+        case InclusiveScanType::GPU_Serial:
+            impl_serial_gpu(d_input, d_output, num_elems);
             break;
         case InclusiveScanType::GPU_OptimizedBaseline:
             impl_baseline(d_input, d_output, num_elems);
@@ -369,10 +395,7 @@ main(int argc, char *argv[])
     }
 
     // Copy output from device to host
-    if (cmd_args.type_ == InclusiveScanType::GPU_OptimizedBaseline ||
-        cmd_args.type_ == InclusiveScanType::GPU_OurDecoupledLookback ||
-        cmd_args.type_ == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
-        cmd_args.type_ == InclusiveScanType::GPU_SimulateOptimalButIncorrect) {
+    if (is_gpu_algorithm(cmd_args.type_)) {
         cuda_check(
             cudaHostAlloc(&h_output, array_size_in_bytes, cudaHostAllocDefault),
             "cudaHostAlloc(h_output)");
@@ -399,9 +422,13 @@ main(int argc, char *argv[])
     }
 
     // Free all resources
-    cudaFree(d_input);
-    cudaFree(d_input);
-    cudaFreeHost(h_output);
+    if (is_gpu_algorithm(cmd_args.type_)) {
+        cudaFree(d_input);
+        cudaFree(d_input);
+        cudaFreeHost(h_output);
+    } else {
+        free(h_output);
+    }
 
     cudaDeviceReset();
     return 0;
