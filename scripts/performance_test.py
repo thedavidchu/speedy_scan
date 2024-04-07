@@ -38,7 +38,6 @@ def get_plot_colour(scan_type: str):
         "CPU_SerialBaseline": ("tab:blue", "solid"),
         "CPU_ParallelBaseline": ("tab:purple", "solid"),
         "CPU_SimulateOptimalButIncorrect": ("tab:cyan", "dashed"),
-
         "GPU_NaiveHierarchical": ("tab:red", "solid"),
         "GPU_OptimizedBaseline": ("tab:orange", "solid"),
         "GPU_OurDecoupledLookback": ("yellow", "solid"),
@@ -107,7 +106,13 @@ def plot_timings(avg_table: Dict[str, Dict[int, float]]):
 
     for key, data_by_size in avg_table.items():
         colour, linestyle = get_plot_colour(key)
-        plt.plot(data_by_size.keys(), data_by_size.values(), label=key, color=colour, linestyle=linestyle)
+        plt.plot(
+            data_by_size.keys(),
+            data_by_size.values(),
+            label=key,
+            color=colour,
+            linestyle=linestyle,
+        )
 
     plt.legend()
     plt.xlabel("Input Size")
