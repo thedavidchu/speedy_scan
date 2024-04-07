@@ -316,8 +316,10 @@ main(int argc, char *argv[])
 
     // Malloc CPU outputs
     int32_t *h_output = nullptr;
-    h_output = (int32_t *)malloc(array_size_in_bytes);
-    assert(h_output && "oom");
+    if (!is_gpu_algorithm(cmd_args.type_)) {
+        h_output = (int32_t *)malloc(array_size_in_bytes);
+        assert(h_output && "oom");
+    }
 
     // Allocate memory
     int32_t *d_input = nullptr;
@@ -420,10 +422,15 @@ main(int argc, char *argv[])
     }
 
     // Free all resources
-    cudaFree(d_input);
-    cudaFree(d_input);
-    cudaFreeHost(h_output);
+    if (is_gpu_algorithm(cmd_args.type_)) {
+        cudaFree(d_input);
+        cudaFree(d_input);
+        cudaFreeHost(h_output);
+    } else {
+        free(h_output);
+    }
 
     cudaDeviceReset();
+
     return 0;
 }
