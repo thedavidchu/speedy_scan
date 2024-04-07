@@ -33,6 +33,9 @@ impl_simulate_optimal_but_incorrect_cpu(const int32_t *h_input,
 extern void
 impl_serial_gpu(const int32_t *d_input, int32_t *d_output, size_t size);
 
+void
+impl_naive_hierarchical(const int32_t *d_input, int32_t *d_output, size_t size);
+
 extern void
 impl_baseline(const int32_t *input, int32_t *output, size_t size);
 
@@ -50,6 +53,7 @@ enum class InclusiveScanType {
     CPU_ParallelBaseline,
     CPU_SimulateOptimalButIncorrect,
     GPU_Serial,
+    GPU_NaiveHierarchical,
     GPU_OptimizedBaseline,
     GPU_OurDecoupledLookback,
     GPU_NvidiaDecoupledLookback,
@@ -65,6 +69,7 @@ std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
      InclusiveScanType::CPU_SimulateOptimalButIncorrect},
     // GPU Algorithms
     {"GPU_Serial", InclusiveScanType::GPU_Serial},
+    {"GPU_NaiveHierarchical", InclusiveScanType::GPU_NaiveHierarchical},
     {"GPU_OptimizedBaseline", InclusiveScanType::GPU_OptimizedBaseline},
     {"GPU_OurDecoupledLookback", InclusiveScanType::GPU_OurDecoupledLookback},
     {"GPU_NvidiaDecoupledLookback", InclusiveScanType::GPU_NvidiaDecoupledLookback},
@@ -77,6 +82,7 @@ is_gpu_algorithm(InclusiveScanType scan_type)
 {
     return (
         scan_type == InclusiveScanType::GPU_Serial ||
+        scan_type == InclusiveScanType::GPU_NaiveHierarchical ||
         scan_type == InclusiveScanType::GPU_OptimizedBaseline ||
         scan_type == InclusiveScanType::GPU_OurDecoupledLookback ||
         scan_type == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
@@ -362,6 +368,9 @@ main(int argc, char *argv[])
             break;
         case InclusiveScanType::GPU_Serial:
             impl_serial_gpu(d_input, d_output, num_elems);
+            break;
+        case InclusiveScanType::GPU_NaiveHierarchical:
+            impl_naive_hierarchical(d_input, d_output, num_elems);
             break;
         case InclusiveScanType::GPU_OptimizedBaseline:
             impl_baseline(d_input, d_output, num_elems);
