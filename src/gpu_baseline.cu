@@ -2,10 +2,6 @@
 
 #include "common.hpp"
 
-////////////////////////////////////////////////////////////////////////////////
-/// OPTIMIZED GPU BASELINE
-////////////////////////////////////////////////////////////////////////////////
-
 /// @brief  Every N elements should be padded by 1.
 ///
 /// @detailed   For every valid N (i.e. greater than or equal to 1), insert
@@ -22,6 +18,39 @@
 /// Source:
 /// https://stackoverflow.com/questions/2745074/fast-ceiling-of-an-integer-division-in-c-c
 #define CEIL_DIV(n, d) (((n) + (d)-1) / (d))
+
+////////////////////////////////////////////////////////////////////////////////
+/// NAIVE SEQUENTIAL GPU BASELINE
+////////////////////////////////////////////////////////////////////////////////
+__global__ void
+naive_sequential(const int32_t *d_input, int32_t *d_output, size_t size)
+{
+    // Implementation
+    if (size == 0) {
+        return;
+    }
+    d_output[0] = d_input[0];
+    for (size_t i = 1; i < size; ++i) {
+        d_output[i] = d_output[i - 1] + d_input[i];
+    }
+}
+
+/// @brief  Run the scan sequentially on the GPU...
+/// @warning    This is VERY slow!
+void
+impl_serial_gpu(const int32_t *d_input, int32_t *d_output, size_t size)
+{
+    if (size > std::numeric_limits<uint32_t>::max())
+        printf("oh no, too many elements ):\n");
+
+    naive_sequential<<<1, 1>>>(d_input, d_output, size);
+
+    cuda_check(cudaDeviceSynchronize());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// OPTIMIZED GPU BASELINE
+////////////////////////////////////////////////////////////////////////////////
 
 __device__ __forceinline__ int32_t
 warp_scan(int32_t my_val)
