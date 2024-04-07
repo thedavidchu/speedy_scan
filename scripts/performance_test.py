@@ -32,8 +32,8 @@ COMMAND_LINE_INPUT_SIZES = [
 ]
 
 
-def get_plot_colour(scan_type: str):
-    """Return the Matplotlib colour for a scan type."""
+def get_plot_colour_and_linestyle(scan_type: str):
+    """Return the Matplotlib colour and linestyle for a scan type."""
     return {
         "CPU_SerialBaseline": ("tab:blue", "solid"),
         "CPU_ParallelBaseline": ("tab:purple", "solid"),
@@ -105,7 +105,7 @@ def plot_timings(avg_table: Dict[str, Dict[int, float]]):
     plt.title(f"Performance Timing for Inclusive Scan Algorithms")
 
     for key, data_by_size in avg_table.items():
-        colour, linestyle = get_plot_colour(key)
+        colour, linestyle = get_plot_colour_and_linestyle(key)
         plt.plot(
             data_by_size.keys(),
             data_by_size.values(),
