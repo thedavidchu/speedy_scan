@@ -29,7 +29,7 @@ COMMAND_LINE_INPUT_SIZES = [
     100_000_000,
     1_000_000_000,
 ]
-REPEATS: int = 1
+REPEATS: int = 10
 
 def chdir_to_top_level():
     out = run(
