@@ -230,14 +230,18 @@ impl_baseline(const int32_t *d_input, int32_t *d_output, size_t size)
 /// OPTIMAL BUT INCORRECT GPU
 ////////////////////////////////////////////////////////////////////////////////
 
-
 void
-impl_optimal_but_incorrect_gpu(const int32_t *d_input, int32_t *d_output, size_t size)
+impl_optimal_but_incorrect_gpu(const int32_t *d_input,
+                               int32_t *d_output,
+                               size_t size)
 {
     if (size > std::numeric_limits<uint32_t>::max())
         printf("oh no, too many elements ):\n");
 
-    cudaMemcpy(d_output,d_input, size * sizeof(int32_t), cudaMemcpyDeviceToDevice);
+    cuda_check(cudaMemcpy(d_output,
+                          d_input,
+                          size * sizeof(int32_t),
+                          cudaMemcpyDeviceToDevice));
 
     cuda_check(cudaDeviceSynchronize());
 }

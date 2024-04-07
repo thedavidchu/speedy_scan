@@ -235,7 +235,7 @@ CommandLineArguments::parse_positive_int(char *arg)
     //      such as '1e12' being interpreted as '1'.
     x = strtol(arg, NULL, 10);
     if (x > INT_MAX) {
-        print_error("'" + std::string(arg) + "' is out of range!");
+        print_error("'" + std::string(arg) + "' is out of range (max int is " + std::to_string(INT_MAX) + ")!");
         print_help();
         exit(-1);
     } else if (x <= 0) {    // Unparseable non-integers will trigger this
@@ -355,8 +355,8 @@ main(int argc, char *argv[])
                               "the correct answer; it merely simulates the "
                               "optimal timing with a memcpy!");
             }
-            impl_optimal_but_incorrect_gpu(h_input.data(),
-                                                    h_output,
+            impl_optimal_but_incorrect_gpu(d_input,
+                                                    d_output,
                                                     num_elems);
             break;
         default:
