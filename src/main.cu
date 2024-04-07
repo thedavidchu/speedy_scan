@@ -4,9 +4,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <map>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include <stdio.h>
 #include <sys/time.h>
@@ -19,6 +19,18 @@ extern void
 impl_serial_cpu_baseline(const int32_t *input, int32_t *output, size_t size);
 
 extern void
+impl_parallel_cpu_baseline(const int32_t *h_input,
+                           int32_t *h_output,
+                           size_t size,
+                           unsigned num_workers);
+
+extern void
+impl_simulate_optimal_but_incorrect_cpu(const int32_t *h_input,
+                                        int32_t *h_output,
+                                        size_t size,
+                                        unsigned num_workers);
+
+extern void
 impl_baseline(const int32_t *input, int32_t *output, size_t size);
 
 extern void
@@ -28,21 +40,32 @@ extern void
 impl_nvidia(const int32_t *input, int32_t *output, size_t size);
 
 enum class InclusiveScanType {
-    SerialCPUBaseline,
-    ParallelCPUBaseline,
-    Baseline,
-    DecoupledLookback,
-    NvidiaScan
+    CPU_SerialBaseline,
+    CPU_ParallelBaseline,
+    CPU_SimulateOptimalButIncorrect,
+    GPU_OptimizedBaseline,
+    GPU_OurDecoupledLookback,
+    GPU_NvidiaDecoupledLookback,
 };
 
 // I just use this as an associative array
-std::map<std::string, InclusiveScanType> scan_types = {
-    {"Baseline", InclusiveScanType::Baseline},
-    {"SerialCPUBaseline", InclusiveScanType::SerialCPUBaseline},
-    {"ParallelCPUBaseline", InclusiveScanType::ParallelCPUBaseline},
-    {"DecoupledLookback", InclusiveScanType::DecoupledLookback},
-    {"NvidiaScan", InclusiveScanType::NvidiaScan},
+std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
+    // CPU Algorithms
+    {"CPU_SerialBaseline", InclusiveScanType::CPU_SerialBaseline},
+    {"CPU_ParallelBaseline", InclusiveScanType::CPU_ParallelBaseline},
+    {"CPU_SimulateOptimalButIncorrect",
+     InclusiveScanType::CPU_SimulateOptimalButIncorrect},
+    // GPU Algorithms
+    {"GPU_OptimizedBaseline", InclusiveScanType::GPU_OptimizedBaseline},
+    {"GPU_OurDecoupledLookback", InclusiveScanType::GPU_OurDecoupledLookback},
+    {"GPU_NvidiaDecoupledLookback", InclusiveScanType::GPU_NvidiaDecoupledLookback},
 };
+
+static void
+print_warning(std::string msg)
+{
+    std::cerr << "Warning: " << msg << std::endl;
+}
 
 static void
 print_error(std::string msg)
@@ -54,7 +77,7 @@ struct CommandLineArguments {
     std::string exe_ = "?";
     // TODO(dchu)   Make these values into macros or somehow deduplicate the
     //              references to them!
-    InclusiveScanType type_ = InclusiveScanType::Baseline;
+    InclusiveScanType type_ = InclusiveScanType::GPU_OptimizedBaseline;
     int size_ = 1000;
     int repeats_ = 1;
     bool check_ = false;
@@ -104,12 +127,27 @@ CommandLineArguments::CommandLineArguments(int argc, char *argv[])
     for (int i = 1; i < argc; ++i) {
         if (matches_str(argv[i], {"-t", "--type"})) {
             ++i;
+            if (i >= argc) {
+                print_error("expecting scan type!");
+                print_help();
+                exit(-1);
+            }
             this->type_ = parse_inclusive_scan_type(argv[i]);
         } else if (matches_str(argv[i], {"--size", "-s"})) {
             ++i;
+            if (i >= argc) {
+                print_error("expecting size!");
+                print_help();
+                exit(-1);
+            }
             this->size_ = parse_positive_int(argv[i]);
         } else if (matches_str(argv[i], {"--repeats", "-r"})) {
             ++i;
+            if (i >= argc) {
+                print_error("expecting repeats!");
+                print_help();
+                exit(-1);
+            }
             this->repeats_ = parse_positive_int(argv[i]);
         } else if (matches_str(argv[i], {"--check", "-c"})) {
             this->check_ = true;
@@ -120,7 +158,7 @@ CommandLineArguments::CommandLineArguments(int argc, char *argv[])
             exit(0);
         } else {
             // TODO(dchu): print out the unexpected argument that we received
-            print_error("unexpected argument");
+            print_error("unexpected argument: '" + std::string(argv[i]) + "'!");
             print_help();
             exit(-1);
         }
@@ -150,7 +188,7 @@ CommandLineArguments::print_help()
         std::cout << str << ",";
     }
     // Delete the trailing comma from the previous print-statement
-    std::cout << "\b}. Default: Baseline" << std::endl;
+    std::cout << "\b}. Default: GPU_OptimizedBaseline" << std::endl;
     std::cout << "    -s, --size <input-size>: number of input elements, 1..= "
                  "~1_000_000_000. Default: 1000"
               << std::endl;
@@ -177,7 +215,7 @@ CommandLineArguments::parse_inclusive_scan_type(char *arg)
             return type;
         }
     }
-    print_error("unrecognized type");
+    print_error("unrecognized scan type: '" + std::string(arg) + "'!");
     print_help();
     exit(-1);
 }
@@ -186,13 +224,16 @@ int
 CommandLineArguments::parse_positive_int(char *arg)
 {
     long x = 0;
+    // NOTE This function strips leading whitespace and interprets until
+    //      it reaches an invalid value. This can create odd results,
+    //      such as '1e12' being interpreted as '1'.
     x = strtol(arg, NULL, 10);
     if (x > INT_MAX) {
-        print_error("out of range");
+        print_error("'" + std::string(arg) + "' is out of range!");
         print_help();
         exit(-1);
-    } else if (x == 0) {
-        print_error("expecting non-zero value");
+    } else if (x <= 0) {    // Unparseable non-integers will trigger this
+        print_error("got '" + std::string(arg) + "', expecting positive, integer value!");
         print_help();
         exit(-1);
     }
@@ -273,21 +314,32 @@ main(int argc, char *argv[])
     for (int i = 0; i < cmd_args.repeats_; ++i) {
         const double start_time = get_time_in_seconds();
         switch (cmd_args.type_) {
-        case InclusiveScanType::SerialCPUBaseline:
+        case InclusiveScanType::CPU_SerialBaseline:
             impl_serial_cpu_baseline(h_input.data(), h_output, num_elems);
             break;
-        case InclusiveScanType::ParallelCPUBaseline:
-            assert(0 && "not implemented");
+        case InclusiveScanType::CPU_ParallelBaseline:
+            impl_parallel_cpu_baseline(h_input.data(), h_output, num_elems, 16);
             break;
-        case InclusiveScanType::Baseline:
+        case InclusiveScanType::CPU_SimulateOptimalButIncorrect:
+            if (cmd_args.check_) {
+                print_warning("CPU_SimulateOptimalButIncorrect does not return "
+                              "the correct answer; it merely simulates the "
+                              "optimal timing with a memcpy!");
+            }
+            impl_simulate_optimal_but_incorrect_cpu(h_input.data(),
+                                                    h_output,
+                                                    num_elems,
+                                                    16);
+            break;
+        case InclusiveScanType::GPU_OptimizedBaseline:
             impl_baseline(d_input, d_output, num_elems);
             break;
 
-        case InclusiveScanType::DecoupledLookback:
+        case InclusiveScanType::GPU_OurDecoupledLookback:
             impl_decoupled_lookback(d_input, d_output, num_elems);
             break;
 
-        case InclusiveScanType::NvidiaScan:
+        case InclusiveScanType::GPU_NvidiaDecoupledLookback:
             impl_nvidia(d_input, d_output, num_elems);
             break;
 
@@ -301,9 +353,9 @@ main(int argc, char *argv[])
     }
 
     // Copy output from device to host
-    if (cmd_args.type_ == InclusiveScanType::Baseline ||
-        cmd_args.type_ == InclusiveScanType::DecoupledLookback ||
-        cmd_args.type_ == InclusiveScanType::NvidiaScan) {
+    if (cmd_args.type_ == InclusiveScanType::GPU_OptimizedBaseline ||
+        cmd_args.type_ == InclusiveScanType::GPU_OurDecoupledLookback ||
+        cmd_args.type_ == InclusiveScanType::GPU_NvidiaDecoupledLookback) {
         cuda_check(
             cudaHostAlloc(&h_output, array_size_in_bytes, cudaHostAllocDefault),
             "cudaHostAlloc(h_output)");

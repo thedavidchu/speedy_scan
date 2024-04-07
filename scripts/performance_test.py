@@ -10,11 +10,12 @@ import matplotlib.pyplot as plt
 
 
 COMMAND_LINE_SCAN_TYPES = [
-    "SerialCPUBaseline",
-    # "ParallelCPUBaseline",
-    "Baseline",
-    "DecoupledLookback",
-    "NvidiaScan",
+    "CPU_SerialBaseline",
+    "CPU_ParallelBaseline",
+    "CPU_SimulateOptimalButIncorrect",
+    "GPU_OptimizedBaseline",
+    "GPU_OurDecoupledLookback",
+    "GPU_NvidiaDecoupledLookback",
 ]
 COMMAND_LINE_INPUT_SIZES = [
     1_000,
@@ -25,7 +26,7 @@ COMMAND_LINE_INPUT_SIZES = [
     100_000_000,
     1_000_000_000,
 ]
-
+REPEATS: int = 1
 
 def chdir_to_top_level():
     out = run(
@@ -53,7 +54,7 @@ def run_and_time_main(
             "--size",
             f"{size}",
             "--repeats",
-            "10",
+            f"{REPEATS}",
             # Add optional arguments
             *(["--debug"] if debug_mode else []),
             *(["--check"] if check_output else []),
@@ -96,9 +97,19 @@ def main():
     parser.add_argument(
         "--recompile", action="store_true", help="Recompile the executable"
     )
+    parser.add_argument("--cpu-only", action="store_true", help="Run only the CPU algorithms")
+    parser.add_argument("--gpu-only", action="store_true", help="Run only the GPU algorithms")
     parser.add_argument("--debug", "-d", action="store_true", help="Debug mode")
     parser.add_argument("--check", "-c", action="store_true", help="Check output")
     args = parser.parse_args()
+
+    global COMMAND_LINE_SCAN_TYPES
+    if args.cpu_only:
+        assert not args.gpu_only
+        COMMAND_LINE_SCAN_TYPES = [x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("CPU_")]
+    if args.gpu_only:
+        assert not args.cpu_only
+        COMMAND_LINE_SCAN_TYPES = [x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("GPU_")]
 
     debug_mode, check_output = args.debug, args.check
 
