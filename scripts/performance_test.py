@@ -15,6 +15,7 @@ COMMAND_LINE_SCAN_TYPES = [
     "CPU_SerialBaseline",
     "CPU_ParallelBaseline",
     "CPU_SimulateOptimalButIncorrect",
+    "GPU_NaiveHierarchical",
     "GPU_OptimizedBaseline",
     "GPU_OurDecoupledLookback",
     "GPU_NvidiaDecoupledLookback",
@@ -29,7 +30,7 @@ COMMAND_LINE_INPUT_SIZES = [
     100_000_000,
     1_000_000_000,
 ]
-REPEATS: int = 10
+
 
 def chdir_to_top_level():
     out = run(
@@ -43,7 +44,7 @@ def chdir_to_top_level():
 
 
 def run_and_time_main(
-    scan_type: str, size: int, debug_mode: bool, check_output: bool
+    scan_type: str, size: int, repeats: int, debug_mode: bool, check_output: bool
 ) -> List[float]:
     """Time the implementation"""
     assert scan_type in COMMAND_LINE_SCAN_TYPES
@@ -57,7 +58,7 @@ def run_and_time_main(
             "--size",
             f"{size}",
             "--repeats",
-            f"{REPEATS}",
+            f"{repeats}",
             # Add optional arguments
             *(["--debug"] if debug_mode else []),
             *(["--check"] if check_output else []),
@@ -74,16 +75,20 @@ def run_and_time_main(
     return times
 
 
-def plot_timings(table: Dict[str, Dict[int, List[int]]]):
-    plt.figure("Performance Timing for Inclusive Scan Algorithms")
-    plt.title("Performance Timing for Inclusive Scan Algorithms")
-
+def postprocess_experiment_data(table: Dict[str, Dict[int, List[int]]]):
     assert all(k in COMMAND_LINE_SCAN_TYPES for k in table.keys())
+    print(f"Raw data: {table}")
     avg_table = {
         scan_type: {size: mean(data) for size, data in data_by_size.items()}
         for scan_type, data_by_size in table.items()
     }
     print(f"Plotted data: {avg_table}")
+    return avg_table
+
+
+def plot_timings(avg_table: Dict[str, Dict[int, float]]):
+    plt.figure(f"Performance Timing for Inclusive Scan Algorithms")
+    plt.title(f"Performance Timing for Inclusive Scan Algorithms")
 
     for key, data_by_size in avg_table.items():
         plt.plot(data_by_size.keys(), data_by_size.values(), label=key)
@@ -92,7 +97,27 @@ def plot_timings(table: Dict[str, Dict[int, List[int]]]):
     plt.xlabel("Input Size")
     plt.ylabel("Time ")
 
-    plt.savefig("performance-timings")
+    plt.savefig(f"performance-timings")
+
+
+def plot_gpu_timings(avg_table: Dict[str, Dict[int, float]]):
+    plt.figure(f"Performance Timing for Inclusive Scan Algorithms (GPU only)")
+    plt.title(f"Performance Timing for Inclusive Scan Algorithms (GPU only)")
+
+    gpu_avg_table = {
+        scan_type: data_by_size
+        for scan_type, data_by_size in avg_table.items()
+        if scan_type.startswith("GPU_")
+    }
+
+    for key, data_by_size in gpu_avg_table.items():
+        plt.plot(data_by_size.keys(), data_by_size.values(), label=key)
+
+    plt.legend()
+    plt.xlabel("Input Size")
+    plt.ylabel("Time ")
+
+    plt.savefig(f"performance-timings-gpu-only")
 
 
 def main():
@@ -100,20 +125,33 @@ def main():
     parser.add_argument(
         "--recompile", action="store_true", help="Recompile the executable"
     )
-    parser.add_argument("--cpu-only", action="store_true", help="Run only the CPU algorithms")
-    parser.add_argument("--gpu-only", action="store_true", help="Run only the GPU algorithms")
+    parser.add_argument(
+        "--cpu-only", action="store_true", help="Run only the CPU algorithms"
+    )
+    parser.add_argument(
+        "--gpu-only", action="store_true", help="Run only the GPU algorithms"
+    )
+    parser.add_argument(
+        "--repeats", type=int, default=10, help="Number of times the test is repeated"
+    )
     parser.add_argument("--debug", "-d", action="store_true", help="Debug mode")
     parser.add_argument("--check", "-c", action="store_true", help="Check output")
     args = parser.parse_args()
 
     global COMMAND_LINE_SCAN_TYPES
-    assert not (args.gpu_only and args.cpu_only), "choose GPU-only, CPU-only, or neither; but not both!"
+    assert not (
+        args.gpu_only and args.cpu_only
+    ), "choose GPU-only, CPU-only, or neither; but not both!"
     if args.cpu_only:
-        COMMAND_LINE_SCAN_TYPES = [x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("CPU_")]
+        COMMAND_LINE_SCAN_TYPES = [
+            x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("CPU_")
+        ]
     if args.gpu_only:
-        COMMAND_LINE_SCAN_TYPES = [x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("GPU_")]
+        COMMAND_LINE_SCAN_TYPES = [
+            x for x in COMMAND_LINE_SCAN_TYPES if x.startswith("GPU_")
+        ]
 
-    debug_mode, check_output = args.debug, args.check
+    repeats, debug_mode, check_output = args.repeats, args.debug, args.check
 
     chdir_to_top_level()
 
@@ -129,9 +167,14 @@ def main():
 
     for key in table:
         for size in table[key]:
-            table[key][size] = run_and_time_main(key, size, debug_mode, check_output)
+            table[key][size] = run_and_time_main(
+                key, size, repeats, debug_mode, check_output
+            )
 
-    plot_timings(table)
+    avg_table = postprocess_experiment_data(table)
+
+    plot_timings(avg_table)
+    plot_gpu_timings(avg_table)
 
 
 if __name__ == "__main__":
