@@ -153,7 +153,7 @@ optimal_but_incorrect_worker(const int32_t *h_input,
 }
 
 void
-impl_optimal_but_incorrect_cpu_baseline(const int32_t *h_input,
+impl_simulate_optimal_but_incorrect_cpu(const int32_t *h_input,
                                         int32_t *h_output,
                                         size_t size,
                                         unsigned num_workers)

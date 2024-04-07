@@ -25,7 +25,7 @@ impl_parallel_cpu_baseline(const int32_t *h_input,
                            unsigned num_workers);
 
 extern void
-impl_optimal_but_incorrect_cpu_baseline(const int32_t *h_input,
+impl_simulate_optimal_but_incorrect_cpu(const int32_t *h_input,
                                         int32_t *h_output,
                                         size_t size,
                                         unsigned num_workers);
@@ -324,7 +324,7 @@ main(int argc, char *argv[])
                               "the correct answer; it merely simulates the "
                               "optimal timing with a memcpy!");
             }
-            impl_optimal_but_incorrect_cpu_baseline(h_input.data(),
+            impl_simulate_optimal_but_incorrect_cpu(h_input.data(),
                                                     h_output,
                                                     num_elems,
                                                     16);
