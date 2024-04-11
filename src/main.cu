@@ -56,6 +56,9 @@ impl_simulate_optimal_but_incorrect_gpu(const int32_t *d_input,
                                         int32_t *d_output,
                                         size_t size);
 
+extern void
+impl_cub_simplified(const int32_t *d_input, int32_t *d_output, size_t size);
+
 enum class InclusiveScanType {
     CPU_Serial,
     CPU_Parallel,
@@ -66,6 +69,7 @@ enum class InclusiveScanType {
     GPU_OurDecoupledLookback,
     GPU_NvidiaDecoupledLookback,
     GPU_SimulateOptimalButIncorrect,
+    GPU_CUBSimplified,
 };
 
 // I just use this as an associative array
@@ -84,17 +88,24 @@ std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
      InclusiveScanType::GPU_NvidiaDecoupledLookback},
     {"GPU_SimulateOptimalButIncorrect",
      InclusiveScanType::GPU_SimulateOptimalButIncorrect},
+    {"GPU_CUBSimplified", InclusiveScanType::GPU_CUBSimplified},
 };
 
 static bool
 is_gpu_algorithm(InclusiveScanType scan_type)
 {
-    return (scan_type == InclusiveScanType::GPU_Serial ||
-            scan_type == InclusiveScanType::GPU_NaiveHierarchical ||
-            scan_type == InclusiveScanType::GPU_OptimizedHierarchical ||
-            scan_type == InclusiveScanType::GPU_OurDecoupledLookback ||
-            scan_type == InclusiveScanType::GPU_NvidiaDecoupledLookback ||
-            scan_type == InclusiveScanType::GPU_SimulateOptimalButIncorrect);
+    switch (scan_type) {
+    case InclusiveScanType::GPU_Serial:
+    case InclusiveScanType::GPU_NaiveHierarchical:
+    case InclusiveScanType::GPU_OptimizedHierarchical:
+    case InclusiveScanType::GPU_OurDecoupledLookback:
+    case InclusiveScanType::GPU_NvidiaDecoupledLookback:
+    case InclusiveScanType::GPU_SimulateOptimalButIncorrect:
+    case InclusiveScanType::GPU_CUBSimplified:
+        return true;
+    default:
+        return false;
+    }
 }
 
 static void
@@ -402,6 +413,9 @@ main(int argc, char *argv[])
             impl_simulate_optimal_but_incorrect_gpu(d_input,
                                                     d_output,
                                                     num_elems);
+            break;
+        case InclusiveScanType::GPU_CUBSimplified:
+            impl_cub_simplified(d_input, d_output, num_elems);
             break;
         default:
             print_error("unrecognized scan type!");
