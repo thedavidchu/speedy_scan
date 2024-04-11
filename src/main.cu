@@ -66,13 +66,13 @@ enum class InclusiveScanType {
     CPU_Serial,
     CPU_StdSerial,
     CPU_Parallel,
-    CPU_SimulateOptimalButIncorrect,
+    CPU_MemoryCopy,
     GPU_Serial,
     GPU_NaiveHierarchical,
     GPU_OptimizedHierarchical,
     GPU_OurDecoupledLookback,
     GPU_NvidiaDecoupledLookback,
-    GPU_SimulateOptimalButIncorrect,
+    GPU_MemoryCopy,
     GPU_CUBSimplified,
 };
 
@@ -82,8 +82,8 @@ std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
     {"CPU_Serial", InclusiveScanType::CPU_Serial},
     {"CPU_StdSerial", InclusiveScanType::CPU_StdSerial},
     {"CPU_Parallel", InclusiveScanType::CPU_Parallel},
-    {"CPU_SimulateOptimalButIncorrect",
-     InclusiveScanType::CPU_SimulateOptimalButIncorrect},
+    {"CPU_MemoryCopy",
+     InclusiveScanType::CPU_MemoryCopy},
     // GPU Algorithms
     {"GPU_Serial", InclusiveScanType::GPU_Serial},
     {"GPU_NaiveHierarchical", InclusiveScanType::GPU_NaiveHierarchical},
@@ -91,8 +91,8 @@ std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
     {"GPU_OurDecoupledLookback", InclusiveScanType::GPU_OurDecoupledLookback},
     {"GPU_NvidiaDecoupledLookback",
      InclusiveScanType::GPU_NvidiaDecoupledLookback},
-    {"GPU_SimulateOptimalButIncorrect",
-     InclusiveScanType::GPU_SimulateOptimalButIncorrect},
+    {"GPU_MemoryCopy",
+     InclusiveScanType::GPU_MemoryCopy},
     {"GPU_CUBSimplified", InclusiveScanType::GPU_CUBSimplified},
 };
 
@@ -105,7 +105,7 @@ is_gpu_algorithm(InclusiveScanType scan_type)
     case InclusiveScanType::GPU_OptimizedHierarchical:
     case InclusiveScanType::GPU_OurDecoupledLookback:
     case InclusiveScanType::GPU_NvidiaDecoupledLookback:
-    case InclusiveScanType::GPU_SimulateOptimalButIncorrect:
+    case InclusiveScanType::GPU_MemoryCopy:
     case InclusiveScanType::GPU_CUBSimplified:
         return true;
     default:
@@ -383,9 +383,9 @@ main(int argc, char *argv[])
         case InclusiveScanType::CPU_Parallel:
             impl_parallel_cpu(h_input.data(), h_output, num_elems, 16);
             break;
-        case InclusiveScanType::CPU_SimulateOptimalButIncorrect:
+        case InclusiveScanType::CPU_MemoryCopy:
             if (cmd_args.check_) {
-                print_warning("CPU_SimulateOptimalButIncorrect does not return "
+                print_warning("CPU_MemoryCopy does not return "
                               "the correct answer; it merely simulates the "
                               "optimal timing with a memcpy!");
             }
@@ -412,9 +412,9 @@ main(int argc, char *argv[])
             impl_nvidia_decoupled_lookback(d_input, d_output, num_elems);
             break;
 
-        case InclusiveScanType::GPU_SimulateOptimalButIncorrect:
+        case InclusiveScanType::GPU_MemoryCopy:
             if (cmd_args.check_) {
-                print_warning("GPU_SimulateOptimalButIncorrect does not return "
+                print_warning("GPU_MemoryCopy does not return "
                               "the correct answer; it merely simulates the "
                               "optimal timing with a memcpy!");
             }
