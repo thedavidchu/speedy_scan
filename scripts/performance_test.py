@@ -244,7 +244,10 @@ def main():
     avg_table = postprocess_experiment_data(table)
 
     plot_timings(avg_table)
-    plot_gpu_timings(avg_table)
+
+    # Plot GPU timing separately if available!
+    if not args.cpu_only:
+        plot_gpu_timings(avg_table)
 
 
 if __name__ == "__main__":
