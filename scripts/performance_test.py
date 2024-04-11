@@ -12,7 +12,10 @@ import matplotlib.pyplot as plt
 
 # NOTE  I rely on these names being prefixed with either "CPU_" or
 #       "GPU_" to filter based on the hardware type.
+# NOTE  This is ranked from slowest to fastest. Yes, the C++ scan is
+#       slower than the naive version. Embarrassing!
 COMMAND_LINE_SCAN_TYPES = [
+    "CPU_StdSerial",
     "CPU_Serial",
     "CPU_Parallel",
     "CPU_SimulateOptimalButIncorrect",
@@ -36,6 +39,7 @@ COMMAND_LINE_INPUT_SIZES = [
 def get_plot_colour_and_linestyle(scan_type: str):
     """Return the Matplotlib colour and linestyle for a scan type."""
     return {
+        "CPU_StdSerial": ("lightsteelblue", "solid"),
         "CPU_Serial": ("tab:blue", "solid"),
         "CPU_Parallel": ("tab:purple", "solid"),
         "CPU_SimulateOptimalButIncorrect": ("tab:cyan", "dashed"),

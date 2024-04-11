@@ -4,8 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <execution>
 #include <functional>
 #include <thread>
+#include <numeric>
 #include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -20,6 +22,13 @@ impl_serial_cpu(const int32_t *h_input, int32_t *h_output, size_t size)
         ans += h_input[i];
         h_output[i] = ans;
     }
+}
+
+void
+impl_std_serial_cpu(const int32_t *h_input, int32_t *h_output, size_t size)
+{
+    // Adding the std::execution::par does not add any performance benefit!
+    std::inclusive_scan(std::execution::par, h_input, &h_input[size], h_output);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
