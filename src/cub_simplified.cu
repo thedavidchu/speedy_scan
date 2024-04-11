@@ -1318,7 +1318,7 @@ InclusiveSum(void *working_area,
  * @param size: number of elements in the input array
  */
 void
-impl_nvidia_decoupled_lookback(const int32_t *d_input,
+impl_cub_simplified(const int32_t *d_input,
                                int32_t *d_output,
                                size_t size)
 {
