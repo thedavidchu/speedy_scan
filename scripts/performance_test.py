@@ -132,7 +132,7 @@ def plot_timings(avg_table: Dict[str, Dict[int, float]]):
 
     plt.legend()
     plt.xlabel("Input Size")
-    plt.ylabel("Time ")
+    plt.ylabel("Time [seconds]")
 
     plt.savefig(f"performance-timings")
 
@@ -159,7 +159,7 @@ def plot_gpu_timings(avg_table: Dict[str, Dict[int, float]]):
 
     plt.legend()
     plt.xlabel("Input Size")
-    plt.ylabel("Time ")
+    plt.ylabel("Time [seconds]")
 
     plt.savefig(f"performance-timings-gpu-only")
 
