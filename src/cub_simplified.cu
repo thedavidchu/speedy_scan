@@ -77,6 +77,7 @@ load_relaxed(uint2 const *ptr)
 #ifdef NO_ASM_MAGIC
     retval = __ldcv(ptr);
 #else
+
     asm volatile("ld.relaxed.gpu.v2.u32 {%0, %1}, [%2];"
                  : "=r"(retval.x), "=r"(retval.y)
                  : "l"(ptr)
@@ -646,7 +647,7 @@ private:
         }
 
         // Perform reduction op if valid
-        if (offset + int(lane_id) <= last_lane)
+        if (int(offset + lane_id) <= last_lane)
             output = input + temp;
 
         return output;
@@ -1188,16 +1189,17 @@ public:
 
     template <typename BlockPrefixCallbackOp>
     __device__ __forceinline__ void
-    ExclusiveSum(int32_t input,   ///< [in] Calling thread's input item
-                 int32_t &output, ///< [out] Calling thread's output item (may
-                                  ///< be aliased to \p input)
-                 BlockPrefixCallbackOp
-                     &block_prefix_callback_op) ///< [in-out]
-                                                ///< <b>[<em>warp</em><sub>0</sub>
-                                                ///< only]</b> Call-back functor
-                                                ///< for specifying a block-wide
-                                                ///< prefix to be applied to the
-                                                ///< logical input sequence.
+    ExclusiveSum(
+        int32_t input,   ///< [in] Calling thread's input item
+        int32_t &output, ///< [out] Calling thread's output item (may
+                         ///< be aliased to \p input)
+        BlockPrefixCallbackOp
+            &block_prefix_callback_op) ///< [in-out]
+                                       ///< <b>[<em>warp</em><sub>0</sub>
+                                       ///< only]</b> Call-back functor
+                                       ///< for specifying a block-wide
+                                       ///< prefix to be applied to the
+                                       ///< logical input sequence.
     {
         ExclusiveScan(input, output, block_prefix_callback_op);
     }
@@ -1233,16 +1235,17 @@ public:
 
     template <typename CallBackOrAgg>
     __device__ __forceinline__ void
-    InclusiveScan(int32_t input,   ///< [in] Calling thread's input item
-                  int32_t &output, ///< [out] Calling thread's output item (may
-                                   ///< be aliased to \p input)
-                  CallBackOrAgg &
-                      block_prefix_callback_op) ///< [in-out]
-                                                ///< <b>[<em>warp</em><sub>0</sub>
-                                                ///< only]</b> Call-back functor
-                                                ///< for specifying a block-wide
-                                                ///< prefix to be applied to the
-                                                ///< logical input sequence.
+    InclusiveScan(
+        int32_t input,   ///< [in] Calling thread's input item
+        int32_t &output, ///< [out] Calling thread's output item (may
+                         ///< be aliased to \p input)
+        CallBackOrAgg
+            &block_prefix_callback_op) ///< [in-out]
+                                       ///< <b>[<em>warp</em><sub>0</sub>
+                                       ///< only]</b> Call-back functor
+                                       ///< for specifying a block-wide
+                                       ///< prefix to be applied to the
+                                       ///< logical input sequence.
     {
         BlockScanWarpScans(temp_storage)
             .InclusiveScan(input, output, block_prefix_callback_op);
@@ -1259,16 +1262,17 @@ public:
     }
 
     __device__ __forceinline__ void
-    InclusiveSum(int32_t input,   ///< [in] Calling thread's input item
-                 int32_t &output, ///< [out] Calling thread's output item (may
-                                  ///< be aliased to \p input)
-                 TilePrefixCallbackOp
-                     &block_prefix_callback_op) ///< [in-out]
-                                                ///< <b>[<em>warp</em><sub>0</sub>
-                                                ///< only]</b> Call-back functor
-                                                ///< for specifying a block-wide
-                                                ///< prefix to be applied to the
-                                                ///< logical input sequence.
+    InclusiveSum(
+        int32_t input,   ///< [in] Calling thread's input item
+        int32_t &output, ///< [out] Calling thread's output item (may
+                         ///< be aliased to \p input)
+        TilePrefixCallbackOp
+            &block_prefix_callback_op) ///< [in-out]
+                                       ///< <b>[<em>warp</em><sub>0</sub>
+                                       ///< only]</b> Call-back functor
+                                       ///< for specifying a block-wide
+                                       ///< prefix to be applied to the
+                                       ///< logical input sequence.
     {
         InclusiveScan(input, output, block_prefix_callback_op);
     }
