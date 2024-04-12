@@ -19,6 +19,9 @@ extern void
 impl_serial_cpu(const int32_t *input, int32_t *output, size_t size);
 
 extern void
+impl_std_serial_cpu(const int32_t *input, int32_t *output, size_t size);
+
+extern void
 impl_parallel_cpu(const int32_t *h_input,
                   int32_t *h_output,
                   size_t size,
@@ -61,6 +64,7 @@ impl_cub_simplified(const int32_t *d_input, int32_t *d_output, size_t size);
 
 enum class InclusiveScanType {
     CPU_Serial,
+    CPU_StdSerial,
     CPU_Parallel,
     CPU_SimulateOptimalButIncorrect,
     GPU_Serial,
@@ -76,6 +80,7 @@ enum class InclusiveScanType {
 std::vector<std::pair<std::string, InclusiveScanType>> scan_types = {
     // CPU Algorithms
     {"CPU_Serial", InclusiveScanType::CPU_Serial},
+    {"CPU_StdSerial", InclusiveScanType::CPU_StdSerial},
     {"CPU_Parallel", InclusiveScanType::CPU_Parallel},
     {"CPU_SimulateOptimalButIncorrect",
      InclusiveScanType::CPU_SimulateOptimalButIncorrect},
@@ -371,6 +376,9 @@ main(int argc, char *argv[])
         switch (cmd_args.type_) {
         case InclusiveScanType::CPU_Serial:
             impl_serial_cpu(h_input.data(), h_output, num_elems);
+            break;
+        case InclusiveScanType::CPU_StdSerial:
+            impl_std_serial_cpu(h_input.data(), h_output, num_elems);
             break;
         case InclusiveScanType::CPU_Parallel:
             impl_parallel_cpu(h_input.data(), h_output, num_elems, 16);

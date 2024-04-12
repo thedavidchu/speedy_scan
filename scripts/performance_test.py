@@ -12,7 +12,10 @@ import matplotlib.pyplot as plt
 
 # NOTE  I rely on these names being prefixed with either "CPU_" or
 #       "GPU_" to filter based on the hardware type.
+# NOTE  This is ranked from slowest to fastest. Yes, the C++ scan is
+#       slower than the naive version. Embarrassing!
 COMMAND_LINE_SCAN_TYPES = [
+    "CPU_StdSerial",
     "CPU_Serial",
     "CPU_Parallel",
     "CPU_SimulateOptimalButIncorrect",
@@ -24,11 +27,24 @@ COMMAND_LINE_SCAN_TYPES = [
 ]
 COMMAND_LINE_INPUT_SIZES = [
     1_000,
+    5_000,
     10_000,
+    50_000,
     100_000,
+    500_000,
     1_000_000,
+    5_000_000,
     10_000_000,
+    50_000_000,
     100_000_000,
+    200_000_000,
+    300_000_000,
+    400_000_000,
+    500_000_000,
+    600_000_000,
+    700_000_000,
+    800_000_000,
+    900_000_000,
     1_000_000_000,
 ]
 
@@ -36,6 +52,7 @@ COMMAND_LINE_INPUT_SIZES = [
 def get_plot_colour_and_linestyle(scan_type: str):
     """Return the Matplotlib colour and linestyle for a scan type."""
     return {
+        "CPU_StdSerial": ("lightsteelblue", "solid"),
         "CPU_Serial": ("tab:blue", "solid"),
         "CPU_Parallel": ("tab:purple", "solid"),
         "CPU_SimulateOptimalButIncorrect": ("tab:cyan", "dashed"),
@@ -227,7 +244,10 @@ def main():
     avg_table = postprocess_experiment_data(table)
 
     plot_timings(avg_table)
-    plot_gpu_timings(avg_table)
+
+    # Plot GPU timing separately if available!
+    if not args.cpu_only:
+        plot_gpu_timings(avg_table)
 
 
 if __name__ == "__main__":
