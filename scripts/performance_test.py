@@ -6,7 +6,6 @@ import os
 import re
 from statistics import mean
 from subprocess import run
-from typing import Dict, List
 from warnings import warn
 
 import matplotlib.pyplot as plt
@@ -25,6 +24,7 @@ COMMAND_LINE_SCAN_TYPES = [
     "GPU_OurDecoupledLookback",
     "GPU_NvidiaDecoupledLookback",
     "GPU_SimulateOptimalButIncorrect",
+    "GPU_CUBSimplified",
 ]
 COMMAND_LINE_INPUT_SIZES = [
     1_000,
@@ -62,6 +62,7 @@ def get_plot_colour_and_linestyle(scan_type: str):
         "GPU_OurDecoupledLookback": ("yellow", "solid"),
         "GPU_NvidiaDecoupledLookback": ("tab:green", "solid"),
         "GPU_SimulateOptimalButIncorrect": ("lime", "dashed"),
+        "GPU_CUBSimplified": ("orange", "dashed"),
     }.get(scan_type, ("grey", "dotted"))
 
 
