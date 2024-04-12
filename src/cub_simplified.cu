@@ -61,19 +61,27 @@ delay()
 static __device__ __forceinline__ void
 store_relaxed(uint2 *ptr, uint2 val)
 {
+#ifdef NO_ASM_MAGIC
+    __stcg(ptr, val);
+#else
     asm volatile("st.relaxed.gpu.v2.u32 [%0], {%1, %2};"
                  :
                  : "l"(ptr), "r"(val.x), "r"(val.y)
                  : "memory");
+#endif
 }
 static __device__ __forceinline__ uint2
 load_relaxed(uint2 const *ptr)
 {
     uint2 retval;
+#ifdef NO_ASM_MAGIC
+    retval = __ldcv(ptr);
+#else
     asm volatile("ld.relaxed.gpu.v2.u32 {%0, %1}, [%2];"
                  : "=r"(retval.x), "=r"(retval.y)
                  : "l"(ptr)
                  : "memory");
+#endif
     return retval;
 }
 
@@ -93,7 +101,11 @@ __device__ __forceinline__ unsigned int
 LaneMaskGe()
 {
     unsigned int ret;
+#ifdef NO_ASM_MAGIC
+    ret = ~((1u << LaneId()) - 1);
+#else
     asm("mov.u32 %0, %%lanemask_ge;" : "=r"(ret));
+#endif
     return ret;
 }
 
@@ -825,9 +837,17 @@ struct BlockScanWarpScans {
 
 // Iterate scan steps
 #pragma unroll
-        for (int STEP = 0; STEP < STEPS; STEP++) {
+        for (unsigned int STEP = 0; STEP < STEPS; STEP++) {
             auto offset = 1u << STEP;
-
+#ifdef NO_ASM_MAGIC
+            auto word = __shfl_up_sync(MEMBER_MASK,
+                                       inclusive_output,
+                                       offset,
+                                       WARP_THREADS);
+            if (LaneId() >= offset) {
+                inclusive_output += word;
+            }
+#else
             asm volatile("{"
                          "  .reg .s32 r0;"
                          "  .reg .pred p;"
@@ -840,6 +860,7 @@ struct BlockScanWarpScans {
                            "r"(offset),
                            "r"(inclusive_output),
                            "r"(MEMBER_MASK));
+#endif
         }
     }
 
