@@ -18,7 +18,11 @@ constexpr unsigned MASK_ALL = 0xffff'ffffu;
 // is opaque to the compiler; make it constexpr to get better optimisation.
 constexpr unsigned WARP_SIZE = 32;
 
+#ifdef BOYS
+constexpr unsigned CHUNK_SIZE = BOYS;
+#else
 constexpr unsigned CHUNK_SIZE = 512;
+#endif
 constexpr unsigned SUBCHUNK_SIZE = WARP_SIZE;
 
 enum class ChunkState : int32_t {

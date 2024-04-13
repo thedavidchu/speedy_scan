@@ -6,9 +6,12 @@ import os
 import re
 from statistics import mean
 from subprocess import run
+from typing import Optional
 from warnings import warn
 
-import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+from matplotlib import pyplot as plt
 
 # NOTE  I rely on these names being prefixed with either "CPU_" or
 #       "GPU_" to filter based on the hardware type.
@@ -50,22 +53,6 @@ COMMAND_LINE_INPUT_SIZES = [
 ]
 
 
-def get_plot_colour_and_linestyle(scan_type: str):
-    """Return the Matplotlib colour and linestyle for a scan type."""
-    return {
-        "CPU_StdSerial": ("lightsteelblue", "solid"),
-        "CPU_Serial": ("tab:blue", "solid"),
-        "CPU_Parallel": ("tab:purple", "solid"),
-        "CPU_SimulateOptimalButIncorrect": ("tab:cyan", "dashed"),
-        "GPU_NaiveHierarchical": ("tab:red", "solid"),
-        "GPU_OptimizedHierarchical": ("tab:orange", "solid"),
-        "GPU_OurDecoupledLookback": ("yellow", "solid"),
-        "GPU_NvidiaDecoupledLookback": ("tab:green", "solid"),
-        "GPU_SimulateOptimalButIncorrect": ("lime", "dashed"),
-        "GPU_CUBSimplified": ("orange", "dashed"),
-    }.get(scan_type, ("grey", "dotted"))
-
-
 def write_result_to_cache(path: str, table: dict[str, dict[int, list[int]]]):
     if os.path.exists(path):
         warn(f"overwriting path {os.path.abspath(path)}")
@@ -94,7 +81,7 @@ def chdir_to_top_level():
 
 def run_and_time_main(
     executable: str, scan_type: str, size: int, repeats: int, debug_mode: bool, check_output: bool
-) -> list[float]:
+) -> float:
     """Time the implementation"""
     assert scan_type in COMMAND_LINE_SCAN_TYPES
     assert size in range(1, 1_000_000_000 + 1)
@@ -116,12 +103,16 @@ def run_and_time_main(
         timeout=60,
         text=True,
     )
-    print(f"{out.stdout.splitlines()}")
     if out.returncode:
         warn(f"{out.stderr.strip()}")
-    lines = [re.match(pattern, s) for s in out.stdout.split("\n")]
+
+    lines = [pattern.match(s) for s in out.stdout.splitlines()]
     times = [float(m.group(1)) for m in lines if m is not None]
-    return times
+
+    print(f"{scan_type} x {size}: {times}")
+    time_avg = mean(times)
+
+    return time_avg
 
 
 def postprocess_experiment_data(table: dict[str, dict[int, list[int]]]):
@@ -135,52 +126,38 @@ def postprocess_experiment_data(table: dict[str, dict[int, list[int]]]):
     return avg_table
 
 
-def plot_timings(avg_table: dict[str, dict[int, float]]):
-    plt.figure("Performance Timing for Inclusive Scan Algorithms")
-    plt.title("Performance Timing for Inclusive Scan Algorithms")
+def plot_timings(df: pd.DataFrame, title_suffix: Optional[str] = None, legend_title: Optional[str] = None):
+    plt.figure(figsize=(12, 7.5))
+    plt.rcParams["savefig.dpi"] = 240
+    plt.rcParams["savefig.transparent"] = True
+    sns.set_theme("paper")
+    sns.despine()
 
-    for key, data_by_size in avg_table.items():
-        colour, linestyle = get_plot_colour_and_linestyle(key)
-        plt.plot(
-            list(data_by_size.keys()),
-            list(data_by_size.values()),
-            label=key,
-            color=colour,
-            linestyle=linestyle,
-        )
+    plt.grid(axis="y", linestyle="--")
+    sns.lineplot(
+        data=df,
+        x="num_elem",
+        y="throughput",
+        palette="Set2",
+        marker=True,
+        style="impl",
+        dashes=False,
+        markers=["o", "X", "^"],
+        markersize=10,
+        hue="impl",
+    )
 
-    plt.legend()
-    plt.xlabel("Input Size")
-    plt.ylabel("Time [seconds]")
-
-    plt.tight_layout()
-    plt.savefig("performance-timings", dpi=300, transparent=True)
-
-
-def plot_gpu_timings(avg_table: dict[str, dict[int, float]]):
-    plt.figure("Performance Timing for Inclusive Scan Algorithms (GPU only)")
-    plt.title("Performance Timing for Inclusive Scan Algorithms (GPU only)")
-
-    gpu_avg_table = {
-        scan_type: data_by_size for scan_type, data_by_size in avg_table.items() if scan_type.startswith("GPU_")
-    }
-
-    for key, data_by_size in gpu_avg_table.items():
-        colour, linestyle = get_plot_colour_and_linestyle(key)
-        plt.plot(
-            list(data_by_size.keys()),
-            list(data_by_size.values()),
-            label=key,
-            color=colour,
-            linestyle=linestyle,
-        )
-
-    plt.legend()
-    plt.xlabel("Input Size")
-    plt.ylabel("Time [seconds]")
+    title = "Performance Timing for Inclusive Scan Algorithms"
+    if title_suffix:
+        title += f" ({title_suffix})"
+    plt.title(title)
+    plt.xlabel("Num. Elements")
+    plt.ylabel("Throughput (elem/sec)")
+    if legend_title:
+        plt.legend(title=legend_title)
 
     plt.tight_layout()
-    plt.savefig("performance-timings-gpu-only", dpi=300, transparent=True)
+    plt.savefig("performance-timings.png")
 
 
 def main():
@@ -197,6 +174,8 @@ def main():
     parser.add_argument("--debug", "-d", action="store_true", help="Debug mode")
     parser.add_argument("--check", "-c", action="store_true", help="Check output")
     parser.add_argument("--executable", default="main", help="Name of executable relative to current working directory")
+    parser.add_argument("--test-bois", action="store_true", help="Varying bois per thread for cub clone")
+    parser.add_argument("--test-boys", action="store_true", help="Varying boys per block for cub clone")
     args = parser.parse_args()
 
     global COMMAND_LINE_SCAN_TYPES
@@ -215,23 +194,45 @@ def main():
         run("make clean".split())
         run("make")
 
-    table = {key: {size: [] for size in COMMAND_LINE_INPUT_SIZES} for key in COMMAND_LINE_SCAN_TYPES}
+    sizes = []
+    timings = []
+    algo = []
+    for impl in COMMAND_LINE_SCAN_TYPES:
+        # if impl in ("GPU_CUBSimplified", "GPU_OurDecoupledLookback"):
+        #     if args.test_bois:
+        #         for i in range(1, 25, 2):
+        #             run("rm src/cub_simplified.o".split())
+        #             run(f"make BOIS={i}".split())
+        #             for input_size in COMMAND_LINE_INPUT_SIZES:
+        #                 t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
+        #                 sizes.append(input_size)
+        #                 timings.append(t)
+        #                 algo.append(f"{impl}_{i}")
+        #     elif args.test_boys:
+        #         for i in (128, 256, 512):
+        #             run("make clean".split())
+        #             run(f"make BOYS={i} -j".split())
+        #             for input_size in COMMAND_LINE_INPUT_SIZES:
+        #                 t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
+        #                 sizes.append(input_size)
+        #                 timings.append(t)
+        #                 algo.append(f"{impl} / {i}")
 
-    if args.use_cached:
-        table = read_result_from_cache("cache.txt")
-    else:
-        for key in table:
-            for size in table[key]:
-                table[key][size] = run_and_time_main(args.executable, key, size, repeats, debug_mode, check_output)
-        write_result_to_cache("cache.txt", table)
+        # else:
+        for input_size in COMMAND_LINE_INPUT_SIZES:
+            t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
+            sizes.append(input_size)
+            timings.append(t)
+            algo.append(impl)
 
-    avg_table = postprocess_experiment_data(table)
-
-    plot_timings(avg_table)
+    table = dict(num_elem=sizes, time=timings, impl=algo)
+    df = pd.DataFrame(table)
+    df['throughput'] = df.num_elem / df.time
+    plot_timings(df, legend_title="Implementation")
 
     # Plot GPU timing separately if available!
-    if not args.cpu_only:
-        plot_gpu_timings(avg_table)
+    # if not args.cpu_only:
+    #     plot_timings(df[df.impl.str.startswith("GPU")], "GPU only")
 
 
 if __name__ == "__main__":

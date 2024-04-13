@@ -9,8 +9,17 @@
 #include <vector_types.h>
 
 static constexpr unsigned int WARP_THREADS = 32;
+#ifdef BOIS
+static constexpr unsigned int NUM_ITEMS_PER_THREAD = BOIS;
+#else
 static constexpr unsigned int NUM_ITEMS_PER_THREAD = 15;
+#endif
+
+#ifdef BOYS
+static constexpr unsigned int THREADS_PER_BLOCK = BOYS;
+#else
 static constexpr unsigned int THREADS_PER_BLOCK = 128;
+#endif
 
 template <typename T,
           typename U,

@@ -2,8 +2,14 @@ NVCC=nvcc
 
 CUDA_SM := sm_86
 
+# number of items per thread
+BOIS = 15
+
+# size of thread block
+BOYS = 128
+
 CXXSTD := -std=c++17
-CXXFLAGS = -Wall -Wextra -Werror -g $(CXXSTD)
+CXXFLAGS = -Wall -Wextra -Werror -g $(CXXSTD) -DNO_ASM_MAGIC -DBOIS=$(BOIS) -DBOYS=$(BOYS)
 
 CUDA_SRCS = $(shell find src -name "*.cu")
 CUDA_OBJS = $(CUDA_SRCS:.cu=.o)
