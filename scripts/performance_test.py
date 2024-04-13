@@ -10,7 +10,9 @@ from typing import Optional
 from warnings import warn
 
 import pandas as pd
-import seaborn as sns
+stevens_implementation = False
+if stevens_implementation:
+    import seaborn as sns
 from matplotlib import pyplot as plt
 
 # NOTE  I rely on these names being prefixed with either "CPU_" or
@@ -21,13 +23,13 @@ COMMAND_LINE_SCAN_TYPES = [
     "CPU_StdSerial",
     "CPU_Serial",
     "CPU_Parallel",
-    "CPU_SimulateOptimalButIncorrect",
+    "CPU_MemoryCopy",
     "GPU_NaiveHierarchical",
     "GPU_OptimizedHierarchical",
     "GPU_OurDecoupledLookback",
     "GPU_NvidiaDecoupledLookback",
-    "GPU_SimulateOptimalButIncorrect",
     "GPU_CUBSimplified",
+    "GPU_MemoryCopy",
 ]
 COMMAND_LINE_INPUT_SIZES = [
     1_000,
@@ -51,6 +53,23 @@ COMMAND_LINE_INPUT_SIZES = [
     900_000_000,
     1_000_000_000,
 ]
+
+
+def get_plot_colour_and_linestyle(scan_type: str):
+    """Return the Matplotlib colour and linestyle for a scan type."""
+    return {
+        "CPU_StdSerial": ("CPU: std::inclusive_scan", "lightsteelblue", "solid"),
+        "CPU_Serial": ("CPU: Serial", "tab:blue", "solid"),
+        "CPU_Parallel": ("CPU: Parallel", "tab:purple", "solid"),
+        "CPU_MemoryCopy": ("CPU: std::memcpy", "tab:pink", "dashed"),
+        "CPU_MaximumMemoryBandwidth": ("CPU: Theoretical Maximum Memory Bandwidth", "tab:cyan", "dotted"),
+        "GPU_NaiveHierarchical": ("GPU: Naive Scan-then-Propagate", "tab:red", "solid"),
+        "GPU_OptimizedHierarchical": ("GPU: Optimized Scan-then-Propagate", "tab:orange", "solid"),
+        "GPU_OurDecoupledLookback": ("GPU: Our Decoupled Look-Back", "yellow", "solid"),
+        "GPU_NvidiaDecoupledLookback": ("GPU: NVIDIA's Decoupled Look-Back", "tab:green", "solid"),
+        "GPU_MemoryCopy": ("GPU: cudaMemcpy", "lawngreen", "dashed"),
+        "GPU_MaximumMemoryBandwidth": ("GPU: Theoretical Maximum Memory Bandwidth", "lime", "dotted"),
+    }.get(scan_type, ("grey", "dotted"))
 
 
 def write_result_to_cache(path: str, table: dict[str, dict[int, list[int]]]):
@@ -114,9 +133,9 @@ def run_and_time_main(
 
     return time_avg
 
-
 def postprocess_experiment_data(table: dict[str, dict[int, list[int]]]):
-    assert all(k in COMMAND_LINE_SCAN_TYPES for k in table.keys())
+    if not all(k in COMMAND_LINE_SCAN_TYPES for k in table.keys()):
+        warn(f"unexpected keys: {set(table) - set(COMMAND_LINE_SCAN_TYPES)}")
     print(f"Raw data: {table}")
     avg_table = {
         scan_type: {size: mean(data) for size, data in data_by_size.items()}
@@ -126,7 +145,7 @@ def postprocess_experiment_data(table: dict[str, dict[int, list[int]]]):
     return avg_table
 
 
-def plot_timings(df: pd.DataFrame, title_suffix: Optional[str] = None, legend_title: Optional[str] = None):
+def plot_timings_with_pandas(df: pd.DataFrame, title_suffix: Optional[str] = None, legend_title: Optional[str] = None):
     plt.figure(figsize=(12, 7.5))
     plt.rcParams["savefig.dpi"] = 240
     plt.rcParams["savefig.transparent"] = True
@@ -158,6 +177,60 @@ def plot_timings(df: pd.DataFrame, title_suffix: Optional[str] = None, legend_ti
 
     plt.tight_layout()
     plt.savefig("performance-timings.png")
+
+
+def plot_timings(avg_table: dict[str, dict[int, float]]):
+    plt.figure(f"Performance Timing for Inclusive Scan Algorithms")
+    plt.title(f"Performance Timing for Inclusive Scan Algorithms")
+
+    # Increase image DPI on save
+    plt.rcParams['savefig.dpi'] = 300
+
+    for key, data_by_size in avg_table.items():
+        pretty_label, colour, linestyle = get_plot_colour_and_linestyle(key)
+        plt.plot(
+            data_by_size.keys(),
+            data_by_size.values(),
+            label=pretty_label,
+            color=colour,
+            linestyle=linestyle,
+        )
+
+    plt.legend()
+    plt.xlabel("Input Size")
+    plt.ylabel("Time [seconds]")
+
+    plt.savefig(f"performance-timings")
+
+
+def plot_gpu_timings(avg_table: dict[str, dict[int, float]]):
+    plt.figure(f"Performance Timing for Inclusive Scan Algorithms (GPU only)")
+    plt.title(f"Performance Timing for Inclusive Scan Algorithms (GPU only)")
+
+    # Increase image DPI on save
+    plt.rcParams['savefig.dpi'] = 300
+
+    gpu_avg_table = {
+        scan_type: data_by_size
+        for scan_type, data_by_size in avg_table.items()
+        if scan_type.startswith("GPU_")
+    }
+
+    for key, data_by_size in gpu_avg_table.items():
+        pretty_label, colour, linestyle = get_plot_colour_and_linestyle(key)
+        plt.plot(
+            data_by_size.keys(),
+            data_by_size.values(),
+            label=pretty_label,
+            color=colour,
+            linestyle=linestyle,
+        )
+
+    plt.legend()
+    plt.xlabel("Input Size")
+    plt.ylabel("Time [seconds]")
+
+    plt.savefig(f"performance-timings")
 
 
 def main():
@@ -194,45 +267,46 @@ def main():
         run("make clean".split())
         run("make")
 
-    sizes = []
-    timings = []
-    algo = []
-    for impl in COMMAND_LINE_SCAN_TYPES:
-        # if impl in ("GPU_CUBSimplified", "GPU_OurDecoupledLookback"):
-        #     if args.test_bois:
-        #         for i in range(1, 25, 2):
-        #             run("rm src/cub_simplified.o".split())
-        #             run(f"make BOIS={i}".split())
-        #             for input_size in COMMAND_LINE_INPUT_SIZES:
-        #                 t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
-        #                 sizes.append(input_size)
-        #                 timings.append(t)
-        #                 algo.append(f"{impl}_{i}")
-        #     elif args.test_boys:
-        #         for i in (128, 256, 512):
-        #             run("make clean".split())
-        #             run(f"make BOYS={i} -j".split())
-        #             for input_size in COMMAND_LINE_INPUT_SIZES:
-        #                 t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
-        #                 sizes.append(input_size)
-        #                 timings.append(t)
-        #                 algo.append(f"{impl} / {i}")
+    if stevens_implementation:
+        sizes = []
+        timings = []
+        algo = []
+        for impl in COMMAND_LINE_SCAN_TYPES:
+            for input_size in COMMAND_LINE_INPUT_SIZES:
+                t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
+                sizes.append(input_size)
+                timings.append(t)
+                algo.append(impl)
 
-        # else:
-        for input_size in COMMAND_LINE_INPUT_SIZES:
-            t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
-            sizes.append(input_size)
-            timings.append(t)
-            algo.append(impl)
+        table = dict(num_elem=sizes, time=timings, impl=algo)
+        df = pd.DataFrame(table)
+        df['throughput'] = df.num_elem / df.time
+        plot_timings(df, legend_title="Implementation")
 
-    table = dict(num_elem=sizes, time=timings, impl=algo)
-    df = pd.DataFrame(table)
-    df['throughput'] = df.num_elem / df.time
-    plot_timings(df, legend_title="Implementation")
+    davids_implementation = True
+    if davids_implementation:
+        table = {
+            key: {size: [] for size in COMMAND_LINE_INPUT_SIZES}
+            for key in COMMAND_LINE_SCAN_TYPES
+        }
 
-    # Plot GPU timing separately if available!
-    # if not args.cpu_only:
-    #     plot_timings(df[df.impl.str.startswith("GPU")], "GPU only")
+        if args.use_cached:
+            table = read_result_from_cache("cache.txt")
+        else:
+            for key in table:
+                for size in table[key]:
+                    table[key][size] = run_and_time_main(
+                        key, size, repeats, debug_mode, check_output
+                    )
+            write_result_to_cache("cache.txt", table)
+
+        avg_table = postprocess_experiment_data(table)
+
+        plot_timings(avg_table)
+
+        # Plot GPU timing separately if available!
+        if not args.cpu_only:
+            plot_gpu_timings(avg_table)
 
 
 if __name__ == "__main__":
