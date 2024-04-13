@@ -145,7 +145,12 @@ def postprocess_experiment_data(table: dict[str, dict[int, list[int]]]):
     return avg_table
 
 
+<<<<<<< HEAD
 def plot_timings_with_pandas(df: pd.DataFrame, title_suffix: Optional[str] = None, legend_title: Optional[str] = None):
+=======
+def plot_timings(df: pd.DataFrame, title_suffix: Optional[str] = None, legend_title: Optional[str] = None):
+    # Plotting timings
+>>>>>>> 3e538a7 (documentation on performance_test.py)
     plt.figure(figsize=(12, 7.5))
     plt.rcParams["savefig.dpi"] = 240
     plt.rcParams["savefig.transparent"] = True
@@ -267,6 +272,7 @@ def main():
         run("make clean".split())
         run("make")
 
+<<<<<<< HEAD
     if stevens_implementation:
         sizes = []
         timings = []
@@ -307,6 +313,46 @@ def main():
         # Plot GPU timing separately if available!
         if not args.cpu_only:
             plot_gpu_timings(avg_table)
+=======
+    sizes = []
+    timings = []
+    algo = []
+    for impl in COMMAND_LINE_SCAN_TYPES:
+        # if impl in ("GPU_CUBSimplified", "GPU_OurDecoupledLookback"):
+        #     if args.test_bois:
+        #         for i in range(1, 25, 2):
+        #             run("rm src/cub_simplified.o".split())
+        #             run(f"make BOIS={i}".split())
+        #             for input_size in COMMAND_LINE_INPUT_SIZES:
+        #                 t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
+        #                 sizes.append(input_size)
+        #                 timings.append(t)
+        #                 algo.append(f"{impl}_{i}")
+        #     elif args.test_boys:
+        #         for i in (128, 256, 512):
+        #             run("make clean".split())
+        #             run(f"make BOYS={i} -j".split())
+        #             for input_size in COMMAND_LINE_INPUT_SIZES:
+        #                 t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
+        #                 sizes.append(input_size)
+        #                 timings.append(t)
+        #                 algo.append(f"{impl} / {i}")
+        # else:
+        for input_size in COMMAND_LINE_INPUT_SIZES:
+            t = run_and_time_main(args.executable, impl, input_size, repeats, debug_mode, check_output)
+            sizes.append(input_size)
+            timings.append(t)
+            algo.append(impl)
+
+    table = dict(num_elem=sizes, time=timings, impl=algo)
+    df = pd.DataFrame(table)
+    df['throughput'] = df.num_elem / df.time
+    plot_timings(df, legend_title="Implementation")
+
+    # Plot GPU timing separately if available!
+    # if not args.cpu_only:
+    #     plot_timings(df[df.impl.str.startswith("GPU")], "GPU only")
+>>>>>>> 3e538a7 (documentation on performance_test.py)
 
 
 if __name__ == "__main__":
